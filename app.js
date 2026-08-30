@@ -568,7 +568,7 @@ function openRegister(){
   $('#registerModal').hidden=false;
 }
 
-function doRegister(){
+async function doRegister(){
   const id=$('#rIdCard').value.trim(),name=$('#rName').value.trim(),pwd=$('#rPwd').value,pwd2=$('#rPwd2').value;
   if(!isIDCard(id))return toast('身份证号格式不正确','err');
   if(!name)return toast('请填写姓名','err');
@@ -577,7 +577,20 @@ function doRegister(){
   const org=$('#rOrg').value.trim();
   if(!org)return toast('请选择所在部门','err');
   const existUser=DB.users.find(u=>u.idCard===id);
-  if(existUser) return toast(existUser.pending?'该身份证号已提交注册，正在审核中':'该身份证号已注册','err');
+  if(existUser){
+    /* 拉云端确认真实状态：本机残留的 pending 可能是已审核通过的旧副本，避免误报「审核中」 */
+    if(window.ZY && ZY.pull){
+      try{
+        const p=await ZY.pull(true);
+        if(p.ok && p.data && Array.isArray(p.data.users)){
+          const cu=p.data.users.find(x=>x.idCard===id);
+          if(cu && cu.activated===true) return toast('该身份证号已审核通过，请使用原密码直接登录','err');
+          if(cu && cu.pending) return toast('该身份证号已提交注册，正在审核中','err');
+        }
+      }catch(e){}
+    }
+    return toast(existUser.pending?'该身份证号已提交注册，正在审核中':'该身份证号已注册','err');
+  }
   const photo=$('#rPhoto').files[0];
   const finish=(avatar)=>{
     const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);

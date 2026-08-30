@@ -24,6 +24,17 @@ window.ZY = (function(){
   let dirty = false;
   let lastSync = Number(localStorage.getItem(LS_LAST) || 0);
 
+  /* ---------- 同步状态（供顶栏指示器实时显示，杜绝「静默失败」） ---------- */
+  let state = {code:'idle', msg:'', at:0};   // idle | syncing | ok | err | offline
+  function setState(code, msg){
+    state = {code:code, msg:msg||'', at:Date.now()};
+    try{ if(window.renderSyncBadge) window.renderSyncBadge(state); }catch(e){}
+  }
+  function getState(){
+    if(!navigator.onLine) return {code:'offline', msg:'当前设备无网络', at:Date.now(), lastSync:lastSync};
+    return Object.assign({}, state, {lastSync:lastSync});
+  }
+
   /* ---------- 加解密（AES-GCM，内置密钥 PBKDF2 派生） ---------- */
   let _keyCache=null;
   async function deriveKey(){
@@ -52,41 +63,65 @@ window.ZY = (function(){
 
   /* ---------- 拉取 / 推送（anon，零配置） ---------- */
   async function pull(){
+    setState('syncing');
     try{
       const r = await fetch(CFG.url + '/rest/v1/zy_db?select=id,data,updated_at&id=eq.1', {
         headers: {'apikey':CFG.key, 'Authorization':'Bearer '+CFG.key}
       });
       const j = await r.json();
-      if(!r.ok) return {ok:false, msg:j.message||'拉取失败'};
-      if(!j.length || !j[0].data || j[0].data === '{}') return {ok:true, empty:true, remoteTs:null};
-      const remoteTs = new Date(j[0].updated_at).getTime();
+      if(!r.ok){ setState('err', j.message||'拉取失败'); return {ok:false, msg:j.message||'拉取失败'}; }
+      /* 【v19.0】data 列是 jsonb：空库时返回 JS 对象 {} 而非字符串 '{}'，
+       * 旧版用 === '{}' 判断永远不成立，导致把空对象送进解密流程报「解密失败」。
+       * 正确判断：只有 string 才是有效密文。 */
+      const row = j[0];
+      if(!j.length || !row || typeof row.data !== 'string' || !row.data){
+        setState('ok'); return {ok:true, empty:true, remoteTs:null};
+      }
+      const remoteTs = new Date(row.updated_at).getTime();
       try{
-        const dec = await decrypt(j[0].data);
+        const dec = await decrypt(row.data);
+        setState('ok');
         return {ok:true, data:dec, remoteTs:remoteTs};
-      }catch(e){ return {ok:false, decryptFail:true, msg:'云端数据解密失败（版本或密钥不一致）', remoteTs:remoteTs}; }
-    }catch(e){ return {ok:false, msg:'网络错误：'+e.message}; }
+      }catch(e){
+        setState('err','云端数据解密失败');
+        return {ok:false, decryptFail:true, msg:'云端数据解密失败（版本或密钥不一致）', remoteTs:remoteTs};
+      }
+    }catch(e){ setState('err','网络错误：'+e.message); return {ok:false, msg:'网络错误：'+e.message}; }
   }
 
+  /* 【v19.0 关键修复】改用 UPSERT（POST + merge-duplicates）并强制校验真实写入行数。
+   * 旧版用 PATCH ?id=eq.1，一旦 id=1 那行被删（历史 resetDB 会整行 DELETE），
+   * PostgREST 对「0 行匹配」的 PATCH 仍返回 204 → 代码误判上传成功，
+   * 数据实际从未落云端，造成「提示已同步但换设备什么都没有」。
+   * 现在：upsert 必然创建或更新 id=1，并用 return=representation 校验行确实写入。 */
   async function push(){
     const db = window.DB || {};
     try{
       const enc = await encrypt(db);
-      let r = await fetch(CFG.url + '/rest/v1/zy_db?id=eq.1', {
-        method: 'PATCH',
-        headers: {'apikey':CFG.key,'Authorization':'Bearer '+CFG.key,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({data: enc})
+      const r = await fetch(CFG.url + '/rest/v1/zy_db', {
+        method: 'POST',
+        headers: {
+          'apikey':CFG.key,'Authorization':'Bearer '+CFG.key,
+          'Content-Type':'application/json',
+          'Prefer':'resolution=merge-duplicates,return=representation'
+        },
+        body: JSON.stringify({id:1, data: enc})
       });
-      if(!r.ok && r.status === 404){
-        r = await fetch(CFG.url + '/rest/v1/zy_db', {
-          method: 'POST',
-          headers: {'apikey':CFG.key,'Authorization':'Bearer '+CFG.key,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-          body: JSON.stringify({id:1, data: enc})
-        });
+      if(!r.ok){
+        const j=await r.json().catch(()=>({}));
+        setState('err', j.message||('上传失败 HTTP '+r.status));
+        return {ok:false, msg:j.message||('上传失败 HTTP '+r.status)};
       }
-      if(!r.ok){ const j=await r.json().catch(()=>({})); return {ok:false, msg:j.message||('上传失败 HTTP '+r.status)}; }
+      /* 真实写入校验：必须返回 1 行且 data 与本次密文一致 */
+      const rows = await r.json().catch(()=>null);
+      if(!Array.isArray(rows) || !rows.length){
+        setState('err','云端未确认写入（返回空行）');
+        return {ok:false, msg:'云端未确认写入，请检查网络后重试'};
+      }
       lastSync = Date.now(); localStorage.setItem(LS_LAST, String(lastSync));
-      return {ok:true};
-    }catch(e){ return {ok:false, msg:'网络错误：'+e.message}; }
+      setState('ok');
+      return {ok:true, bytes: enc.length};
+    }catch(e){ setState('err','网络错误：'+e.message); return {ok:false, msg:'网络错误：'+e.message}; }
   }
 
   function markDirty(){ dirty = true; scheduleFlush(); }
@@ -142,31 +177,79 @@ window.ZY = (function(){
     return !d || (!(d.users||[]).length && !(d.services||[]).length && !(d.activities||[]).length);
   }
 
-  /* ---------- 合并（只增不删，本地优先；任何设备的数据都不丢失） ---------- */
-  function mergeArrays(localArr, cloudArr, keyFn){
+  /* ---------- 墓碑（tombstone）：记录「已删除」，防止合并时被云端复活 ----------
+   * 旧版 mergeArrays 是「只增不删」，任何一台设备删掉的成员/活动，
+   * 下一次轮询就被云端旧副本并回来 → 「删了又出现」「身份证一直被占用」。
+   * 现在删除时写墓碑（DB._tomb['users:身份证号']=时间戳），合并时按墓碑过滤，
+   * 且墓碑本身在设备间同步，保证「一处删除、全网生效」。 */
+  function tombKey(type, key){ return type+':'+key; }
+  function tomb(type, key){
+    if(!window.DB || !key) return;
+    if(!window.DB._tomb) window.DB._tomb={};
+    window.DB._tomb[tombKey(type,key)] = Date.now();
+    try{ if(window.saveDB) window.saveDB(); }catch(e){}
+    markDirty();
+  }
+  function tombMany(type, keys){
+    if(!window.DB) return;
+    if(!window.DB._tomb) window.DB._tomb={};
+    (keys||[]).forEach(k=>{ if(k) window.DB._tomb[tombKey(type,k)]=Date.now(); });
+    try{ if(window.saveDB) window.saveDB(); }catch(e){}
+    markDirty();
+  }
+  function mergeTombs(local, cloud){
+    const out=Object.assign({}, cloud||{});
+    Object.keys(local||{}).forEach(k=>{ if(!out[k] || local[k]>out[k]) out[k]=local[k]; });
+    /* 90 天后自动清理墓碑，避免无限膨胀 */
+    const cut=Date.now()-90*24*3600*1000;
+    Object.keys(out).forEach(k=>{ if(out[k]<cut) delete out[k]; });
+    return out;
+  }
+
+  /* ---------- 用户合并（云为权威，根治「审核通过后又变回审核中」） ----------
+   * 关键：成员手机每 15s 轮询，会拉到云端「已 activated」的用户；
+   * 若按旧逻辑（本地优先）合并，本地残留的 pending 副本会盖掉云端 activated，
+   * 并随下一次 push 回写云端 → 审核被成员自己的手机撤销，永久卡在「审核中」。
+   * 新逻辑：① 云端副本优先入 map；② 仅当本地有、云端没有时才补入（保留本机刚注册、
+   * 尚未上云的独有用户）；③ 冲突一律云端胜；④ 墓碑过滤已删除用户。 */
+  function mergeUsers(localArr, cloudArr, tombs){
+    const map={};
+    (cloudArr||[]).forEach(x=>{ if(x && x.idCard) map[x.idCard]=x; });
+    (localArr||[]).forEach(x=>{ if(x && x.idCard && !map[x.idCard]) map[x.idCard]=x; });
+    if(tombs){ Object.keys(map).forEach(k=>{ if(tombs['users:'+k]) delete map[k]; }); }
+    return Object.values(map);
+  }
+
+  /* ---------- 合并（本地优先 + 墓碑过滤；未删除的数据谁都不丢） ---------- */
+  function mergeArrays(localArr, cloudArr, keyFn, type, tombs){
     const map={};
     (cloudArr||[]).forEach(x=>{ if(x&&keyFn(x)) map[keyFn(x)]=x; });
     (localArr||[]).forEach(x=>{ if(x&&keyFn(x)) map[keyFn(x)]=x; });
+    if(type && tombs){
+      Object.keys(map).forEach(k=>{ if(tombs[tombKey(type,k)]) delete map[k]; });
+    }
     return Object.values(map);
   }
   function mergeDB(local, cloud){
     const out=JSON.parse(JSON.stringify(cloud||{}));
-    out.users=mergeArrays(local.users, cloud.users, u=>u.idCard);
-    out.services=mergeArrays(local.services, cloud.services, s=>s.id);
-    out.activities=mergeArrays(local.activities, cloud.activities, a=>a.id);
-    out.tasks=mergeArrays(local.tasks, cloud.tasks, t=>t.id);
-    out.news=mergeArrays(local.news, cloud.news, n=>n.id);
-    out.notifies=mergeArrays(local.notifies, cloud.notifies, n=>n.id);
-    out.others=mergeArrays(local.others, cloud.others, o=>o.id);
-    out.broadcastRecs=mergeArrays(local.broadcastRecs, cloud.broadcastRecs, x=>x.id);
-    out.etiquetteRecs=mergeArrays(local.etiquetteRecs, cloud.etiquetteRecs, x=>x.id);
-    out.subleagueRecs=mergeArrays(local.subleagueRecs, cloud.subleagueRecs, x=>x.id);
-    out.quotas=mergeArrays(local.quotas, cloud.quotas, q=>q.id);
-    out.evaluations=mergeArrays(local.evaluations, cloud.evaluations, e=>e.id);
-    out.reports=mergeArrays(local.reports, cloud.reports, r=>r.id);
-    out.summaries=mergeArrays(local.summaries, cloud.summaries, s=>s.id);
-    out.traces=mergeArrays(local.traces, cloud.traces, t=>t.id);
-    out.logs=mergeArrays(local.logs, cloud.logs, l=>l.id);
+    const T=mergeTombs(local._tomb, cloud._tomb);
+    out._tomb=T;
+    out.users=mergeUsers(local.users, cloud.users, T);
+    out.services=mergeArrays(local.services, cloud.services, s=>s.id, 'services', T);
+    out.activities=mergeArrays(local.activities, cloud.activities, a=>a.id, 'activities', T);
+    out.tasks=mergeArrays(local.tasks, cloud.tasks, t=>t.id, 'tasks', T);
+    out.news=mergeArrays(local.news, cloud.news, n=>n.id, 'news', T);
+    out.notifies=mergeArrays(local.notifies, cloud.notifies, n=>n.id, 'notifies', T);
+    out.others=mergeArrays(local.others, cloud.others, o=>o.id, 'others', T);
+    out.broadcastRecs=mergeArrays(local.broadcastRecs, cloud.broadcastRecs, x=>x.id, 'broadcastRecs', T);
+    out.etiquetteRecs=mergeArrays(local.etiquetteRecs, cloud.etiquetteRecs, x=>x.id, 'etiquetteRecs', T);
+    out.subleagueRecs=mergeArrays(local.subleagueRecs, cloud.subleagueRecs, x=>x.id, 'subleagueRecs', T);
+    out.quotas=mergeArrays(local.quotas, cloud.quotas, q=>q.id, 'quotas', T);
+    out.evaluations=mergeArrays(local.evaluations, cloud.evaluations, e=>e.id, 'evaluations', T);
+    out.reports=mergeArrays(local.reports, cloud.reports, r=>r.id, 'reports', T);
+    out.summaries=mergeArrays(local.summaries, cloud.summaries, s=>s.id, 'summaries', T);
+    out.traces=mergeArrays(local.traces, cloud.traces, t=>t.id, 'traces', T);
+    out.logs=mergeArrays(local.logs, cloud.logs, l=>l.id, 'logs', T);
     if(cloud.dictionaries&&local.dictionaries){
       out.dictionaries=JSON.parse(JSON.stringify(cloud.dictionaries));
       Object.keys(local.dictionaries||{}).forEach(k=>{
@@ -203,8 +286,37 @@ window.ZY = (function(){
     return p;
   }
 
+  /* ---------- 手动立即同步（顶栏点击云图标触发，给用户一个确定性的动作） ---------- */
+  async function syncNow(){
+    setState('syncing');
+    const p = await pull();
+    if(p.ok && p.data && !p.empty){
+      if(isCloudEmpty(p.data) && hasLocalData()){
+        return await push();
+      }
+      const merged = mergeDB(window.DB||{}, p.data);
+      window.DB = merged;
+      if(window.normalizeDB) window.normalizeDB();
+      if(window.saveDB) window.saveDB();
+      const pu = await push();
+      if(window.renderRoute) window.renderRoute();
+      if(window.updateNotifyBadge) window.updateNotifyBadge();
+      return pu;
+    }
+    if(p.ok) return await push();          // 云端空 → 直接上传本地
+    if(p.decryptFail) return await push(); // 云端密文不可读 → 用本地覆盖修复
+    return p;
+  }
+
+  /* 断网恢复后立刻补同步，保证「离线期间的记录」不丢 */
+  try{
+    window.addEventListener('online', ()=>{ setState('syncing'); syncNow().catch(()=>{}); });
+    window.addEventListener('offline', ()=>{ setState('offline','当前设备无网络'); });
+  }catch(e){}
+
   return {
-    pull, push, bootstrap, markDirty, startPoll, stopPoll,
+    pull, push, bootstrap, markDirty, startPoll, stopPoll, syncNow,
+    tomb, tombMany, getState,
     get cfg(){ return CFG; }
   };
 })();
