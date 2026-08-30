@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宣汉职业中专学校 · 志愿服务智慧管理平台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23c8161d' d='M32 56s-22-14-22-30c0-8 7-15 15-15 4 0 8 2 10 6 2-4 6-6 10-6 8 0 15 7 15 15 0 16-22 30-28 30z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=15">
+</head>
+<body>
+
+<!-- ============================================ 登录页 ============================================ -->
+<div id="loginPage" class="login">
+  <div class="login-bg"></div>
+
+  <div class="login-main">
+    <div class="login-left">
+      <img src="logo.png" class="lt-logo" alt="志愿者徽章">
+      <h1 class="lt-title">四川省宣汉职业中专学校 志愿服务平台</h1>
+      <p class="lt-sub">— 点燃爱心 传递温暖 —</p>
+    </div>
+
+    <div class="login-right">
+      <div class="login-card">
+        <div class="lc-head">
+          <h3>欢 迎 登 录</h3>
+          <p>WELCOME TO LOGIN</p>
+        </div>
+        <div class="lc-body lc-horizontal">
+          <div class="lc-row">
+            <span class="lc-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="#c8161d" stroke-width="1.6"/><path d="M4 21c1.3-4 4.5-6 8-6s6.7 2 8 6" fill="none" stroke="#c8161d" stroke-width="1.6"/></svg></span>
+            <input id="loginId" type="text" placeholder="身份证号" maxlength="18" autocomplete="off">
+          </div>
+          <div class="lc-row">
+            <span class="lc-icon"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1" fill="none" stroke="#c8161d" stroke-width="1.6"/><path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="#c8161d" stroke-width="1.6"/></svg></span>
+            <input id="loginPwd" type="password" placeholder="密码">
+            <button class="eye" id="eyeToggle" type="button">显示</button>
+          </div>
+          <div class="lc-row lc-captcha-row">
+            <input id="loginCaptcha" type="text" placeholder="验证码" maxlength="4" autocomplete="off">
+            <span class="captcha" id="captchaBox"></span>
+          </div>
+          <button id="btnLogin" class="login-btn">登 录</button>
+        </div>
+        <div class="lc-foot">
+          <a id="goRegister">志愿者注册</a>
+          <i></i>
+          <a id="goForgot">忘记密码</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="login-foot">© 2026 四川省宣汉职业中专学校 · 青年志愿者协会 · 校团委 主办</div>
+</div>
+
+<!-- ============================================ 注册 ============================================ -->
+<div id="registerModal" class="mask" hidden>
+  <div class="modal">
+    <div class="modal-title"><span class="bar"></span>志愿者注册<span class="bar"></span><button class="x" data-close="registerModal">×</button></div>
+    <div class="modal-body"><p class="warn">注册信息提交后由超级管理员审核，审核通过后方可登录。</p><div class="grid-2" id="registerForm"></div></div>
+    <div class="modal-foot"><button class="ghost" data-close="registerModal">取消</button><button class="primary" id="btnRegSubmit">提交注册</button></div>
+  </div>
+</div>
+
+<!-- ============================================ 找回密码 ============================================ -->
+<div id="forgotModal" class="mask" hidden>
+  <div class="modal">
+    <div class="modal-title"><span class="bar"></span>找回密码<span class="bar"></span><button class="x" data-close="forgotModal">×</button></div>
+        <div class="modal-body"><p class="warn">凭「身份证号 + 姓名」或「身份证号 + 动态口令」重置登录密码（动态口令可在「我的档案」中查看）。</p><div class="form-grid">
+      <label>身份证号<i>*</i><input id="fId" maxlength="18"></label>
+      <label>姓名（或留空，改用动态口令）</label><input id="fName">
+      <label>动态口令（6 位，每 30 秒更新）</label><input id="fKey" maxlength="6">
+      <label>新登录密码<i>*</i><input id="fPwd1" type="password"></label>
+      <label>再次输入新密码<i>*</i><input id="fPwd2" type="password"></label>
+    </div></div>
+    <div class="modal-foot"><button class="ghost" data-close="forgotModal">取消</button><button class="primary" id="btnForgotSubmit">提交重置</button></div>
+  </div>
+</div>
+
+<!-- ============================================ 主应用 ============================================ -->
+<div id="app" hidden>
+
+  <!-- 顶部红条 -->
+  <header class="topbar">
+    <div class="tb-inner">
+      <div class="tb-left">
+        <span class="tb-logo"><img src="logo.png" alt="徽章"></span>
+        <span class="tb-name">志愿服务平台</span>
+      </div>
+      <nav class="tb-nav" id="tbNav">
+        <a data-nav="dashboard" class="active">首页</a>
+        <a data-nav="activities">活动中心</a>
+        <a data-nav="news">信息动态</a>
+        <a data-nav="tasks">任务中心</a>
+        <a data-nav="data">数据中心</a>
+        <a data-nav="summary">月度总结</a>
+        <a data-nav="audit">审核中心</a>
+      </nav>
+      <div class="tb-right">
+        <span class="tb-msg" id="tbMsg">站内通知 <em id="tbMsgBadge">0</em></span>
+        <span class="tb-user">
+          <span class="tb-avatar" id="tbAvatar">--</span>
+          <span class="tb-uname" id="tbUname">--</span>
+        </span>
+        <button class="tb-logout" id="btnLogout">退出</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 单机版同步限制警告条（首次登录显示，可关闭，刷新重显） -->
+  <div id="syncBanner" class="sync-banner" hidden>
+    <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86l-8.18 14.14A2 2 0 0 0 3.83 21h16.34a2 2 0 0 0 1.72-3l-8.18-14.14a2 2 0 0 0-3.42 0z" stroke-linejoin="round"/></svg></span>
+    <span class="sb-text"><b>单机版提醒：</b>当前数据仅保存本设备浏览器，换设备/清缓存即丢失，跨设备实时同步、注册审核实时通知尚未启用。<a id="syncBannerMore" href="javascript:void(0)">了解升级到云端 →</a></span>
+    <span class="sb-actions"><button class="sb-btn" id="syncBannerDismiss">我已知晓</button></span>
+    <button class="sb-close" id="syncBannerClose" title="关闭">×</button>
+  </div>
+
+  <div class="layout">
+    <!-- 左侧侧边栏 -->
+    <aside class="sidebar">
+      <div class="sb-user">
+        <div class="sb-avatar" id="sbAvatar">--</div>
+        <div class="sb-info">
+          <div class="sb-name" id="sbName">--</div>
+          <div class="sb-role" id="sbRole">--</div>
+        </div>
+      </div>
+      <nav class="sb-nav" id="sbNav"></nav>
+    </aside>
+
+    <main class="main">
+      <div class="main-head">
+        <div class="crumbs">
+          <span class="crumb-icon">
+            <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="#909399" stroke-width="1.6"/></svg>
+          </span>
+          <span id="crumbs">总控看板</span>
+        </div>
+        <div class="main-filters">
+          <select id="gfDept" class="mf-select"><option value="">全部专业部</option></select>
+          <select id="gfGrade" class="mf-select"><option value="">全部年级</option></select>
+          <div class="mf-search">
+            <input id="gfKw" type="text" placeholder="姓名 / 身份证号">
+            <button id="gfSearch" class="mf-btn">搜索</button>
+          </div>
+        </div>
+        <div class="main-meta">
+          <span class="mm-date" id="mainDate"></span>
+          <span class="mm-per" id="mainPeriod">2026 上期</span>
+        </div>
+      </div>
+      <section id="viewRoot" class="view-root"></section>
+    </main>
+  </div>
+</div>
+
+<!-- 通知抽屉 -->
+<div id="notifyDrawer" class="drawer" hidden>
+  <div class="drawer-mask" data-close-drawer="notifyDrawer"></div>
+  <div class="drawer-panel">
+    <div class="dp-head"><span>站内通知</span><button data-close-drawer="notifyDrawer">关闭</button></div>
+    <div class="dp-tabs">
+      <button class="active" data-ntab="all">全部</button>
+      <button data-ntab="unread">未读</button>
+      <button data-ntab="sys">系统</button>
+      <button data-ntab="act">活动</button>
+      <button data-ntab="audit">审核</button>
+    </div>
+    <div class="dp-body" id="notifyList"></div>
+  </div>
+</div>
+
+<!-- 二维码抽屉 -->
+<div id="qrDrawer" class="drawer" hidden>
+  <div class="drawer-mask" data-close-drawer="qrDrawer"></div>
+  <div class="drawer-panel">
+    <div class="dp-head"><span>二维码分享</span><button data-close-drawer="qrDrawer">关闭</button></div>
+    <div class="dp-body" id="qrBody"></div>
+  </div>
+</div>
+
+<!-- 热力图抽屉 -->
+<div id="heatDrawer" class="drawer" hidden>
+  <div class="drawer-mask" data-close-drawer="heatDrawer"></div>
+  <div class="drawer-panel wide">
+    <div class="dp-head"><span>服务热力图</span><button data-close-drawer="heatDrawer">关闭</button></div>
+    <div class="dp-body" id="heatBody"></div>
+  </div>
+</div>
+
+<!-- 图片预览 -->
+<div id="imgViewer" class="img-viewer" hidden>
+  <span class="iv-mask" data-close="imgViewer"></span>
+  <img id="ivImg" alt="预览">
+  <button class="iv-close" data-close="imgViewer">×</button>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="modalHost"></div>
+
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="vendor/qrcode-gen.js"></script>
+<script src="app.js?v=15"></script>
+<script src="app-biz.js?v=15"></script>
+</body>
+</html>
