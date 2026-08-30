@@ -721,7 +721,7 @@ window.doAppointAdmin=()=>{
   const uid=$('#apUser').value;if(!uid)return toast('请选择人员','err');
   const u=DB.users.find(x=>x.id===uid);const role=$('#apRole2').value;
   const rl=(DB.dictionaries.role.find(r=>r.val===role)||{}).label;
-  confirmDialog(`确认将 <b>${esc(u.name)}</b> 任命为「${rl}」？`,()=>{u.role=role;u.activated=true;u.pending=false;u.status='正常在岗';u.title=rl;u.position=rl;saveDB();pushLog('任命管理员',`任命 ${u.name} 为 ${rl}`);renderSettings($('#viewRoot'));toast('任命成功','ok')},'任命管理员');
+  confirmDialog(`确认将 <b>${esc(u.name)}</b> 任命为「${rl}」？`,()=>{u.role=role;u.activated=true;u.pending=false;u.status='正常在岗';u.title=rl;u.position=rl;u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();pushLog('任命管理员',`任命 ${u.name} 为 ${rl}`);renderSettings($('#viewRoot'));toast('任命成功，已同步到云端，对方登录即生效','ok')},'任命管理员');
 };
 window.openTransferBox=function(){const box=$('#transferBox');if(!box)return;box.innerHTML=`<div class="tip-line">将超级管理员权限移交给接班人，原管理员自动降级。</div><div class="form-grid cols-2"><label>选择接班人<select id="trTo">${DB.users.filter(u=>u.id!==currentUser.id&&u.role!=='dev').map(u=>`<option value="${u.id}">${esc(u.name)}（${esc(u.dept||'-')} ${esc(u.cls||'-')}）</option>`).join('')}</select></label><label>原管理员降级为<select id="trFromRole"><option>member</option><option>president</option><option>vice</option><option>minister</option></select></label></div><button class="primary mt-12" style="height:38px;padding:0 24px;" onclick="doTransfer()">确认换届移交</button>`};
 window.addDept=()=>{const name=prompt('请输入新专业部名称：');if(!name)return;if(DB.dictionaries.departments.includes(name))return toast('该专业部已存在','err');DB.dictionaries.departments.push(name);DB.dictionaries.classes[name]=[];saveDB();if(window.ZY)ZY.push();renderDeptMgr();toast('已新增','ok')};
@@ -740,9 +740,9 @@ window.doTransfer=()=>{
   if(!toId)return toast('请选择接班人','err');
   const to=DB.users.find(u=>u.id===toId);
   confirmDialog(`确认将超级管理员权限移交给 <b>${esc(to.name)}</b>？移交后您将降级。`,()=>{
-    currentUser.role=fromRole;currentUser.title='志愿者';currentUser.position='志愿者';
-    to.role='super';to.title='超级管理员';to.position='会长';to.activated=true;
-    saveDB();toast('换届完成，请重新登录','ok');setTimeout(()=>{localStorage.removeItem(LS_USR);location.reload()},1200);
+    currentUser.role=fromRole;currentUser.title='志愿者';currentUser.position='志愿者';currentUser.updatedAt=Date.now();
+    to.role='super';to.title='超级管理员';to.position='会长';to.activated=true;to.updatedAt=Date.now();
+    saveDB();if(window.ZY)ZY.push();toast('换届完成，已同步到云端，请重新登录','ok');setTimeout(()=>{localStorage.removeItem(LS_USR);location.reload()},1200);
   },'确认换届');
 };
 

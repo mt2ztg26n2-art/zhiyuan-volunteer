@@ -541,6 +541,20 @@ function doLogin(){
     }
     return toast(u.pending?'账号未激活：注册申请正在审核中，请稍后再试':'账号未激活，请联系管理员','err');
   }
+  /* v19.13 角色/职位同步：本机已有账号也要拉云端核对本人最新资料——
+     * 管理员改了角色/职位/状态后，成员登录必须是云端最新版，而不是本机旧副本（否则永远显示"志愿者"）。
+     * 云端 updatedAt >= 本地时以云端为准（管理员改动的角色/职位/激活状态才会覆盖本端）。 */
+  if(window.ZY && ZY.pull){
+    return ZY.pull(true).then(p=>{
+      if(p.ok && p.data && Array.isArray(p.data.users)){
+        const cu=p.data.users.find(x=>x.idCard===id);
+        if(cu && Number(cu.updatedAt||0) >= Number(u.updatedAt||0)){
+          Object.assign(u,cu); saveDB();
+        }
+      }
+      doEnter(u);
+    }).catch(()=>doEnter(u));
+  }
   doEnter(u);
 }
 function doEnter(u){
@@ -551,6 +565,15 @@ function doEnter(u){
   try{ renderApp(); }catch(err){ console.error('renderApp 失败:', err); toast('已进入主界面但渲染异常: '+err.message,'err'); }
   setTimeout(()=>showWelcome(u.name),150);
 }
+/* v19.13：云端合并（轮询/手动同步）后，把当前登录者的最新资料（角色/职位/状态/部门等）刷新进
+ * currentUser，成员界面无需重新登录即可看到管理员任命的职位生效。 */
+window.refreshCurrentUser=function(){
+  if(typeof currentUser==='undefined'||!currentUser) return;
+  try{
+    const nu=DB.users.find(x=>x.idCard===currentUser.idCard);
+    if(nu){ Object.assign(currentUser,nu); }
+  }catch(e){}
+};
 
 /* 登录验证码 */
 let captchaValue='';
@@ -626,7 +649,7 @@ async function doRegister(){
   }
   const photo=$('#rPhoto').files[0];
   const finish=async (avatar)=>{
-    const nu={id:newUserId(),idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now(),_regVia:'register'};
+    const nu={id:newUserId(),idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now(),updatedAt:now(),_regVia:'register'};
     /* CloudBase 模式：注册走云函数（服务端查重 + bcrypt + 写 pending + 通知部门管理员） */
     if(window.ZY && ZY.cloud && ZY.register){
       ZY.register(nu).then(r=>{
@@ -1110,21 +1133,22 @@ window.openUserForm=function(existing){
         Object.assign(t,{name,role:$('#ufRole').value,gender:$('#ufGender').value,birth:$('#ufBirth').value,nation:$('#ufNation').value,politics:$('#ufPolitics').value,religion:$('#ufReligion').value,dept:$('#ufDept').value,cls:$('#ufCls').value,org:$('#ufOrg').value,title:$('#ufTitle').value,email:$('#ufEmail').value,phone:$('#ufPhone').value,qq:$('#ufQQ').value,wechat:$('#ufWechat').value,native:$('#ufNative').value,addr:$('#ufAddr').value,live:$('#ufLive').value,edu:$('#ufEdu').value,status:$('#ufStatus').value,exp:$('#ufExp').value,hobby:$('#ufHobby').value},collectUfExtra());
         if(avatar)t.avatar=avatar;
         if($('#ufPwd').value)t.pwd=$('#ufPwd').value;
+        t.updatedAt=Date.now();   /* v19.13：任何档案修改都打时间戳，合并时云端按 updatedAt 取胜，角色/职位改动才能同步给成员 */
         pushLog('修改档案',`修改 ${t.name}`);
       }else{
-        DB.users.push({id:newUserId(),idCard,name,pwd:$('#ufPwd').value,role:$('#ufRole').value,org:$('#ufOrg').value,gender:$('#ufGender').value,birth:$('#ufBirth').value,nation:$('#ufNation').value,politics:$('#ufPolitics').value,religion:$('#ufReligion').value,dept:$('#ufDept').value,cls:$('#ufCls').value,title:$('#ufTitle').value,email:$('#ufEmail').value,phone:$('#ufPhone').value,qq:$('#ufQQ').value,wechat:$('#ufWechat').value,native:$('#ufNative').value,addr:$('#ufAddr').value,live:$('#ufLive').value,edu:$('#ufEdu').value,status:$('#ufStatus').value,avatar,exp:$('#ufExp').value,hobby:$('#ufHobby').value,position:'志愿者',activated:true,pending:false,createdAt:now()},collectUfExtra());
+        DB.users.push({id:newUserId(),idCard,name,pwd:$('#ufPwd').value,role:$('#ufRole').value,org:$('#ufOrg').value,gender:$('#ufGender').value,birth:$('#ufBirth').value,nation:$('#ufNation').value,politics:$('#ufPolitics').value,religion:$('#ufReligion').value,dept:$('#ufDept').value,cls:$('#ufCls').value,title:$('#ufTitle').value,email:$('#ufEmail').value,phone:$('#ufPhone').value,qq:$('#ufQQ').value,wechat:$('#ufWechat').value,native:$('#ufNative').value,addr:$('#ufAddr').value,live:$('#ufLive').value,edu:$('#ufEdu').value,status:$('#ufStatus').value,avatar,exp:$('#ufExp').value,hobby:$('#ufHobby').value,position:'志愿者',activated:true,pending:false,createdAt:now(),updatedAt:now()},collectUfExtra());
         pushLog('录入档案',`录入 ${name}`);
       }
-      saveDB();closeModal();toast(isEdit?'已保存':'已录入','ok');
+      saveDB();if(window.ZY)ZY.push();closeModal();toast(isEdit?'已保存':'已录入','ok');
       if(currentRoute()==='files')filesSearch();
     };
     if(photo){const r=new FileReader();r.onload=()=>finish(r.result);r.readAsDataURL(photo)}else finish(u?u.avatar:'');
   };
 };
 
-window.removeUser=(id)=>{const u=DB.users.find(x=>x.id===id);confirmDialog(`确认撤销 <b>${esc(u.name)}</b> 的职位？`,()=>{u.role='member';u.activated=false;u.status='退出志愿';saveDB();filesSearch();toast('已撤销','ok')},'撤销职位')};
-window.graduateUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认将 <b>${esc(u.name)}</b> 毕业升级？系统会自动建立对应新年级组织。`,()=>{const m=(u.cls||'').match(/(\d{2})级/);if(!m)return toast('该档案未填写班级年级，无法毕业','err');const ng=String(parseInt(m[1])+1).padStart(2,'0')+'级';if(!(DB.dictionaries.grades||[]).includes(ng))(DB.dictionaries.grades||(DB.dictionaries.grades=[])).push(ng);u.cls=u.cls.replace(m[0],ng);u.grade=ng;u.status='正常在岗';const cl=DB.dictionaries.classes&&DB.dictionaries.classes[u.dept];if(cl&&!cl.includes(u.cls))cl.push(u.cls);saveDB();pushLog('毕业',`${u.name} 毕业升级至 ${ng}`);filesSearch();toast('已毕业升级至 '+ng,'ok')},'毕业升级')};
-window.cancelUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;if(!canEdit())return toast('仅管理员可注销成员档案','err');confirmDialog(`确认注销 <b>${esc(u.name)}</b> 的志愿者身份？<br><span class="f12 c-3">注销后该成员不可登录，档案标记为"注销"并保留备查。</span>`,()=>{u.status='注销';u.activated=false;u.pending=false;saveDB();pushLog('注销',`注销 ${u.name}`);filesSearch();toast('已注销','ok')},'注销档案')};
+window.removeUser=(id)=>{const u=DB.users.find(x=>x.id===id);confirmDialog(`确认撤销 <b>${esc(u.name)}</b> 的职位？`,()=>{u.role='member';u.activated=false;u.status='退出志愿';u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();filesSearch();toast('已撤销','ok')},'撤销职位')};
+window.graduateUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认将 <b>${esc(u.name)}</b> 毕业升级？系统会自动建立对应新年级组织。`,()=>{const m=(u.cls||'').match(/(\d{2})级/);if(!m)return toast('该档案未填写班级年级，无法毕业','err');const ng=String(parseInt(m[1])+1).padStart(2,'0')+'级';if(!(DB.dictionaries.grades||[]).includes(ng))(DB.dictionaries.grades||(DB.dictionaries.grades=[])).push(ng);u.cls=u.cls.replace(m[0],ng);u.grade=ng;u.status='正常在岗';u.updatedAt=Date.now();const cl=DB.dictionaries.classes&&DB.dictionaries.classes[u.dept];if(cl&&!cl.includes(u.cls))cl.push(u.cls);saveDB();if(window.ZY)ZY.push();pushLog('毕业',`${u.name} 毕业升级至 ${ng}`);filesSearch();toast('已毕业升级至 '+ng,'ok')},'毕业升级')};
+window.cancelUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;if(!canEdit())return toast('仅管理员可注销成员档案','err');confirmDialog(`确认注销 <b>${esc(u.name)}</b> 的志愿者身份？<br><span class="f12 c-3">注销后该成员不可登录，档案标记为"注销"并保留备查。</span>`,()=>{u.status='注销';u.activated=false;u.pending=false;u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();pushLog('注销',`注销 ${u.name}`);filesSearch();toast('已注销','ok')},'注销档案')};
 window.openQuitRegister=function(){
   if(!canEdit())return toast('仅管理员可操作','err');
   const candidates=DB.users.filter(u=>u.role!=='dev'&&u.id!==currentUser.id&&(u.status||'正常在岗')!=='注销').sort((a,b)=>String(a.dept||'').localeCompare(String(b.dept||'')));
@@ -1135,7 +1159,7 @@ window.openQuitRegister=function(){
   const updCnt=()=>{const n=document.querySelectorAll('.qr-cb:checked').length;$('#qrCnt').textContent='已选 '+n+' 人';};
   $('#qrAll').onchange=(e)=>{const on=e.target.checked;document.querySelectorAll('.qr-cb').forEach(cb=>{cb.checked=on;});updCnt();};
   document.querySelectorAll('.qr-cb').forEach(cb=>cb.onchange=updCnt);
-  $('#qrSubmit').onclick=()=>{const ids=[...document.querySelectorAll('.qr-cb:checked')].map(cb=>cb.value);if(!ids.length)return toast('请先勾选要注销的成员','err');confirmDialog(`确认注销 <b>${ids.length}</b> 位成员？<br><span class="f12 c-3">注销后不可登录，档案保留备查。</span>`,()=>{let n=0;ids.forEach(id=>{const u=DB.users.find(x=>x.id===id);if(u){u.status='注销';u.activated=false;u.pending=false;n++;pushLog('注销',`批量注销 ${u.name}`);}});saveDB();closeModal();filesSearch();toast('已注销 '+n+' 人','ok')},'批量注销');};
+  $('#qrSubmit').onclick=()=>{const ids=[...document.querySelectorAll('.qr-cb:checked')].map(cb=>cb.value);if(!ids.length)return toast('请先勾选要注销的成员','err');confirmDialog(`确认注销 <b>${ids.length}</b> 位成员？<br><span class="f12 c-3">注销后不可登录，档案保留备查。</span>`,()=>{let n=0;ids.forEach(id=>{const u=DB.users.find(x=>x.id===id);if(u){u.status='注销';u.activated=false;u.pending=false;u.updatedAt=Date.now();n++;pushLog('注销',`批量注销 ${u.name}`);}});saveDB();if(window.ZY)ZY.push();closeModal();filesSearch();toast('已注销 '+n+' 人，已同步到云端','ok')},'批量注销');};
 };
 window.viewSecret=function(id){
   if(!canEdit())return toast('仅管理员可查看成员密钥','err');
@@ -1167,7 +1191,7 @@ window.viewPaper=function(id){
     ${list.length?`<div class="paper-grid">${list.map(f=>f.dataUrl&&f.type&&f.type.indexOf('image/')===0?`<div class="paper-item" onclick="viewImg('${f.dataUrl}')" title="${esc(f.name)}"><img src="${f.dataUrl}"><span class="paper-name">${esc(f.name)}</span><span class="paper-meta">${esc(f.uploader||'-')} · ${esc((f.time||'').slice(0,10))}</span></div>`:`<div class="paper-file"><a href="${f.dataUrl}" download="${esc(f.name)}">${esc(f.name)}</a><span class="paper-meta">${esc(f.uploader||'-')} · ${esc((f.time||'').slice(0,10))}</span></div>`).join('')}</div>`:'<div class="empty-tip">暂无纸质档案</div>'}
   </div><div class="modal-foot">${canEdit()?`<button class="primary" onclick="uploadPaper('${u.id}')">上传纸质档案</button>`:''}<button class="ghost" data-close-modal>关闭</button></div></div>`);
 };
-window.appointUser=(id)=>{const u=DB.users.find(x=>x.id===id);openModal(`<div class="modal" style="width:480px;"><div class="modal-title"><span class="bar"></span>任命 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid"><label>角色<select id="apRole">${(DB.dictionaries.role||[]).filter(x=>x.val!=='dev').map(r=>`<option value="${r.val}">${r.label}</option>`).join('')}</select></label><label>职位名称<input id="apTitle" value="${esc(u.title||'')}"></label></div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="apSave">确认任命</button></div></div>`);$('#apSave').onclick=()=>{u.role=$('#apRole').value;u.title=$('#apTitle').value;u.position=u.title;u.activated=true;saveDB();closeModal();filesSearch();toast('任命成功','ok')}};
+window.appointUser=(id)=>{const u=DB.users.find(x=>x.id===id);openModal(`<div class="modal" style="width:480px;"><div class="modal-title"><span class="bar"></span>任命 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid"><label>角色<select id="apRole">${(DB.dictionaries.role||[]).filter(x=>x.val!=='dev').map(r=>`<option value="${r.val}">${r.label}</option>`).join('')}</select></label><label>职位名称<input id="apTitle" value="${esc(u.title||'')}"></label></div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="apSave">确认任命</button></div></div>`);$('#apSave').onclick=()=>{u.role=$('#apRole').value;u.title=$('#apTitle').value;u.position=u.title;u.activated=true;u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();closeModal();filesSearch();toast('任命成功，已同步到云端，对方登录即生效','ok')}};
 window.openRemoveUser=function(){const candidates=DB.users.filter(u=>u.role!=='dev'&&u.role!=='member'&&u.id!==currentUser.id);if(!candidates.length)return toast('暂无可撤销的管理员','err');openModal(`<div class="modal" style="width:520px;"><div class="modal-title"><span class="bar"></span>撤销职位<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><p class="warn">撤销后降为「志愿者」且停用账号。</p><table class="tbl"><thead><tr><th>姓名</th><th>职位</th><th>专业部</th><th></th></tr></thead><tbody>${candidates.map(u=>`<tr><td>${esc(u.name)}</td><td><span class="role-tag ${roleClass(u.role)}">${esc(roleLabel(u.role))}</span></td><td>${esc(u.dept||'-')}</td><td><button class="warn" onclick="removeUser('${u.id}')" style="height:26px;padding:0 10px;background:#fff;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;border-radius:2px;">撤销</button></td></tr>`).join('')}</tbody></table></div><div class="modal-foot"><button class="ghost" data-close-modal>关闭</button></div></div>`)};
 
 window.exportCertPDF=function(id){

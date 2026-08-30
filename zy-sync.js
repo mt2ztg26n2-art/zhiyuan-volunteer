@@ -240,6 +240,7 @@ window.ZY = (function(){
               try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
               const backup = window.DB;
               window.DB = merged;
+              try{ if(window.refreshCurrentUser) window.refreshCurrentUser(); }catch(e){}   /* v19.13 角色/职位改动实时刷进当前登录者 */
               if(window.normalizeDB) window.normalizeDB();
               if(window.saveDB) window.saveDB();
               if(window.renderRoute) window.renderRoute();
@@ -365,6 +366,7 @@ window.ZY = (function(){
       const backup = window.DB;
       try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
       window.DB = mergeDB(window.DB||{}, p.data);
+      try{ if(window.refreshCurrentUser) window.refreshCurrentUser(); }catch(e){}   /* v19.13 角色/职位改动实时刷进当前登录者 */
       if(window.normalizeDB) window.normalizeDB();
       if(window.saveDB) window.saveDB();
       if(window.renderRoute) window.renderRoute();
@@ -389,6 +391,7 @@ window.ZY = (function(){
       const merged = mergeDB(window.DB||{}, p.data);
       try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
       window.DB = merged;
+      try{ if(window.refreshCurrentUser) window.refreshCurrentUser(); }catch(e){}   /* v19.13 角色/职位改动实时刷进当前登录者 */
       if(window.normalizeDB) window.normalizeDB();
       if(window.saveDB) window.saveDB();
       if(window.renderRoute) window.renderRoute();
