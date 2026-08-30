@@ -1,0 +1,10 @@
+{
+  "name": "zy-api",
+  "version": "1.0.0",
+  "description": "宣汉职校志愿服务平台 CloudBase 云函数（登录/注册/审核/数据同步）",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.1.0",
+    "bcryptjs": "^2.4.3"
+  }
+}

@@ -5,3 +5,5 @@ _*.sh
 *.tmp
 *.log
 .DS_Store
+.cloudbase/
+cloudbase-creds.json

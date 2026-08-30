@@ -465,6 +465,21 @@ function doLogin(){
   if(!id||!pwd)return toast('请填写身份证号和登录密码','err');
   if(!cap)return toast('请输入验证码','err');
   if(!checkCaptcha(cap)){toast('验证码错误，请重新输入','err');drawCaptcha();$('#loginCaptcha').value='';return}
+  /* CloudBase 模式：登录走云函数（bcrypt + JWT，服务端权威） */
+  if(window.ZY && ZY.cloud && ZY.login){
+    return ZY.login(id, pwd).then(r=>{
+      if(r.ok && r.user){
+        /* 服务端返回的 user 已脱敏（无 pwd/totpSecret），写本地供界面使用 */
+        const cu=r.user;
+        const ex=DB.users.find(x=>x.idCard===id);
+        if(ex) Object.assign(ex,cu); else DB.users.push(cu);
+        saveDB();
+        doEnter(cu);
+        return;
+      }
+      toast((r&&r.msg)||'身份证号或密码不正确','err');
+    });
+  }
   let u=DB.users.find(x=>x.idCard===id&&x.pwd===pwd);
   if(!u){
     /* 本机无该用户：可能云端有（新设备首次登录 / 他端注册后本机未同步），先拉云端核对 */
@@ -594,7 +609,16 @@ async function doRegister(){
   const photo=$('#rPhoto').files[0];
   const finish=(avatar)=>{
     const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
-    DB.users.push({id:'u-'+next,idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now()});
+    const nu={id:'u-'+next,idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now()};
+    /* CloudBase 模式：注册走云函数（服务端查重 + bcrypt + 写 pending + 通知部门管理员） */
+    if(window.ZY && ZY.cloud && ZY.register){
+      ZY.register(nu).then(r=>{
+        if(r.ok){ toast(r.msg||'注册成功！请等待本部门管理员审核','ok'); $('#registerModal').hidden=true; }
+        else { toast(r.msg||'注册失败，请重试','err'); }
+      });
+      return;
+    }
+    DB.users.push(nu);
     saveDB();
     pushLog('注册',`新注册 ${name}，待审核`);
     /* 按部门分流通知：本部门管理员才能收到审核通知，超级/终端管理员可收到全部 */
@@ -612,6 +636,14 @@ function doForgot(){
   if(!isIDCard(id))return toast('身份证号不正确','err');
   if(p1.length<6)return toast('新密码至少 6 位','err');
   if(p1!==p2)return toast('两次密码输入不一致','err');
+  /* CloudBase 模式：重置密码走云函数（服务端姓名/口令校验 + bcrypt） */
+  if(window.ZY && ZY.cloud && ZY.resetPwd){
+    ZY.resetPwd({idCard:id, name, key, pwd:p1, pwd2:p2}).then(r=>{
+      if(r.ok){ toast(r.msg||'密码已重置，请用新密码登录','ok'); $('#forgotModal').hidden=true; }
+      else toast(r.msg||'重置失败，请核对后重试','err');
+    });
+    return;
+  }
   const u=DB.users.find(x=>x.idCard===id);
   if(!u)return toast('该身份证号未注册','err');
   if(key){
