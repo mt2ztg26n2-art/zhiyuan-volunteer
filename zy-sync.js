@@ -108,6 +108,12 @@ window.ZY = (function(){
       }catch(e){ /* 云端拉取失败则直接上传本地 */ }
       /* 2) 上传（UPSERT + 校验真实写入） */
       const enc = await encrypt(target);
+      /* 【v19.4 防护】超大 payload 会触发 PostgREST 语句超时（此前 role 膨胀到 6MB 就是
+       * 这么断的）——加密后超过 2MB 拒绝上传并提示，避免再次"写入失败还提示成功"。 */
+      if(enc.length > 2*1024*1024){
+        setState('err','数据过大('+(enc.length/1024/1024).toFixed(1)+'MB)，已停止上传');
+        return {ok:false, msg:'数据过大('+(enc.length/1024/1024).toFixed(1)+'MB)，请先在系统设置-数据维护清理，或联系管理员排查字典膨胀'};
+      }
       const r = await fetch(CFG.url + '/rest/v1/zy_db', {
         method: 'POST',
         headers: {
@@ -278,7 +284,18 @@ window.ZY = (function(){
       out.dictionaries=JSON.parse(JSON.stringify(cloud.dictionaries));
       Object.keys(local.dictionaries||{}).forEach(k=>{
         const a=out.dictionaries[k], b=local.dictionaries[k];
-        if(Array.isArray(a)&&Array.isArray(b)) out.dictionaries[k]=Array.from(new Set([...a,...b]));
+        if(Array.isArray(a)&&Array.isArray(b)){
+          /* 【v19.4 关键修复】字典数组合并必须按内容去重（对象数组 new Set 按引用
+           * 比较永远去不掉重，15 秒轮询一次累加，role 膨胀到 18 万条/6MB → 云端
+           * upsert 语句超时 → 所有数据同步失败）。用 JSON 序列化做 key 去重，
+           * 并限长 200 条防异常膨胀。 */
+          const seen=new Set(), outArr=[];
+          [...a,...b].forEach(x=>{
+            let key = (x && typeof x==='object') ? JSON.stringify(x) : String(x);
+            if(!seen.has(key)){ seen.add(key); outArr.push(x); }
+          });
+          out.dictionaries[k]=outArr.slice(0,200);
+        }
         else if(b!=null&&a==null) out.dictionaries[k]=b;
       });
     }
