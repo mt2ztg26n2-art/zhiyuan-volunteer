@@ -137,13 +137,25 @@ function loadDB(){
 function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
 async function resetDB(){
   if(!confirm('确定清除所有数据并恢复到初始纯净状态（不含演示数据）吗？该操作不可恢复，请先导出 Excel 备份！')) return;
-  /* 关键：必须等云端三张表真正清空完成，再清本地并刷新；否则刷新会打断清空请求，
-     云端仍是旧数据（含已注册身份证），重新登录又被同步拉回，身份证"死灰复燃"被占用 */
+  /* v19.14：不再整表 DELETE zy_db（会连带删掉墓碑、还会造成历史"0 行 204 假成功"）。
+   * 改为：先给所有非系统数据打墓碑 → 清空 → 合并上传（墓碑随合并传播到全网，
+   * 其它设备残留的旧数据也会被过滤，真正"一次清除全网干净"）→ 再清本机刷新。 */
+  const sysIds=['u-super','u-term','u-dev'];
+  const bizKeys=['activities','services','tasks','news','notifies','broadcastRecs','etiquetteRecs','subleagueRecs','quotas','evaluations','reports','summaries','logs','traces'];
+  try{
+    if(window.ZY && ZY.stopPoll) ZY.stopPoll();
+    if(window.ZY && ZY.tomb){
+      (DB.users||[]).filter(u=>!sysIds.includes(u.id)).forEach(u=>{ if(u.idCard) ZY.tomb('users', u.idCard); });
+      bizKeys.forEach(k=>{ (DB[k]||[]).forEach(x=>{ if(x&&x.id) ZY.tomb(k, x.id); }); });
+    }
+  }catch(e){}
+  DB.users=(DB.users||[]).filter(u=>sysIds.includes(u.id));
+  bizKeys.forEach(k=>{ DB[k]=[]; });
+  saveDB();
   try{
     if(window.ZY){
-      try{ if(ZY.stopPoll) ZY.stopPoll(); }catch(e){}
+      const p=await ZY.push(); if(p&&!p.ok) toast('本地已清空，但云端同步失败：'+(p.msg||'')+'，请检查网络后重试','err');
       const c=ZY.cfg, h={'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json'};
-      await fetch(c.url+'/rest/v1/zy_db?id=not.is.null',{method:'DELETE',headers:h});
       await fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:h});
       await fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:h});
     }
@@ -649,6 +661,9 @@ async function doRegister(){
   }
   const photo=$('#rPhoto').files[0];
   const finish=async (avatar)=>{
+    /* v19.14：若该身份证此前被"清除数据"打过墓碑，先解本地墓碑；
+     * 上传成功后还需 untombPush 移除云端墓碑（见下方），否则新注册会被旧墓碑过滤掉。 */
+    try{ if(window.ZY && ZY.untomb) ZY.untomb('users', id); }catch(e){}
     const nu={id:newUserId(),idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now(),updatedAt:now(),_regVia:'register'};
     /* CloudBase 模式：注册走云函数（服务端查重 + bcrypt + 写 pending + 通知部门管理员） */
     if(window.ZY && ZY.cloud && ZY.register){
@@ -675,6 +690,9 @@ async function doRegister(){
         syncMsg=(r&&r.msg)||'';
       }catch(e){ syncOk=false; syncMsg=e.message; }
       if(!syncOk && window.ZY.markDirty) window.ZY.markDirty(); /* 15秒轮询会自动重试上传 */
+      /* v19.14：移除该身份证的云端墓碑（若此前被清除数据打过墓碑），
+         否则 mergeUsers 会把新注册按墓碑过滤掉，审核中心永远看不到 */
+      try{ if(window.ZY && ZY.untombPush) await ZY.untombPush(['users:'+id]); }catch(e){}
     }
     $('#registerModal').hidden=true;
     if(syncOk) toast('注册成功！已同步云端，请等待本部门管理员审核','ok');
@@ -1146,9 +1164,9 @@ window.openUserForm=function(existing){
   };
 };
 
-window.removeUser=(id)=>{const u=DB.users.find(x=>x.id===id);confirmDialog(`确认撤销 <b>${esc(u.name)}</b> 的职位？`,()=>{u.role='member';u.activated=false;u.status='退出志愿';u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();filesSearch();toast('已撤销','ok')},'撤销职位')};
+window.removeUser=(id)=>{const u=DB.users.find(x=>x.id===id);confirmDialog(`确认撤销 <b>${esc(u.name)}</b> 的职位？`,()=>{const oldLabel=roleLabel(u.role);u.role='member';u.activated=false;u.status='退出志愿';u.title='志愿者';u.position='志愿者';u.updatedAt=Date.now();pushNotify({to:u.name,kind:'sys',title:'职位撤销',content:`${u.name}，您已被撤销「${oldLabel}」职位，恢复为普通志愿者（账号已停用，请联系管理员激活）。`});saveDB();if(window.ZY)ZY.push();filesSearch();toast('已撤销并通知对方','ok')},'撤销职位')};
 window.graduateUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认将 <b>${esc(u.name)}</b> 毕业升级？系统会自动建立对应新年级组织。`,()=>{const m=(u.cls||'').match(/(\d{2})级/);if(!m)return toast('该档案未填写班级年级，无法毕业','err');const ng=String(parseInt(m[1])+1).padStart(2,'0')+'级';if(!(DB.dictionaries.grades||[]).includes(ng))(DB.dictionaries.grades||(DB.dictionaries.grades=[])).push(ng);u.cls=u.cls.replace(m[0],ng);u.grade=ng;u.status='正常在岗';u.updatedAt=Date.now();const cl=DB.dictionaries.classes&&DB.dictionaries.classes[u.dept];if(cl&&!cl.includes(u.cls))cl.push(u.cls);saveDB();if(window.ZY)ZY.push();pushLog('毕业',`${u.name} 毕业升级至 ${ng}`);filesSearch();toast('已毕业升级至 '+ng,'ok')},'毕业升级')};
-window.cancelUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;if(!canEdit())return toast('仅管理员可注销成员档案','err');confirmDialog(`确认注销 <b>${esc(u.name)}</b> 的志愿者身份？<br><span class="f12 c-3">注销后该成员不可登录，档案标记为"注销"并保留备查。</span>`,()=>{u.status='注销';u.activated=false;u.pending=false;u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();pushLog('注销',`注销 ${u.name}`);filesSearch();toast('已注销','ok')},'注销档案')};
+window.cancelUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;if(!canEdit())return toast('仅管理员可注销成员档案','err');confirmDialog(`确认注销 <b>${esc(u.name)}</b> 的志愿者身份？<br><span class="f12 c-3">注销后该成员不可登录，档案标记为"注销"并保留备查。</span>`,()=>{u.status='注销';u.activated=false;u.pending=false;u.updatedAt=Date.now();pushNotify({to:u.name,kind:'sys',title:'账号注销',content:`${u.name}，您的志愿者账号已被管理员注销，不可再登录；如有疑问请联系管理员。`});saveDB();if(window.ZY)ZY.push();pushLog('注销',`注销 ${u.name}`);filesSearch();toast('已注销并通知对方','ok')},'注销档案')};
 window.openQuitRegister=function(){
   if(!canEdit())return toast('仅管理员可操作','err');
   const candidates=DB.users.filter(u=>u.role!=='dev'&&u.id!==currentUser.id&&(u.status||'正常在岗')!=='注销').sort((a,b)=>String(a.dept||'').localeCompare(String(b.dept||'')));
@@ -1159,7 +1177,7 @@ window.openQuitRegister=function(){
   const updCnt=()=>{const n=document.querySelectorAll('.qr-cb:checked').length;$('#qrCnt').textContent='已选 '+n+' 人';};
   $('#qrAll').onchange=(e)=>{const on=e.target.checked;document.querySelectorAll('.qr-cb').forEach(cb=>{cb.checked=on;});updCnt();};
   document.querySelectorAll('.qr-cb').forEach(cb=>cb.onchange=updCnt);
-  $('#qrSubmit').onclick=()=>{const ids=[...document.querySelectorAll('.qr-cb:checked')].map(cb=>cb.value);if(!ids.length)return toast('请先勾选要注销的成员','err');confirmDialog(`确认注销 <b>${ids.length}</b> 位成员？<br><span class="f12 c-3">注销后不可登录，档案保留备查。</span>`,()=>{let n=0;ids.forEach(id=>{const u=DB.users.find(x=>x.id===id);if(u){u.status='注销';u.activated=false;u.pending=false;u.updatedAt=Date.now();n++;pushLog('注销',`批量注销 ${u.name}`);}});saveDB();if(window.ZY)ZY.push();closeModal();filesSearch();toast('已注销 '+n+' 人，已同步到云端','ok')},'批量注销');};
+  $('#qrSubmit').onclick=()=>{const ids=[...document.querySelectorAll('.qr-cb:checked')].map(cb=>cb.value);if(!ids.length)return toast('请先勾选要注销的成员','err');confirmDialog(`确认注销 <b>${ids.length}</b> 位成员？<br><span class="f12 c-3">注销后不可登录，档案保留备查。</span>`,()=>{let n=0;ids.forEach(id=>{const u=DB.users.find(x=>x.id===id);if(u){u.status='注销';u.activated=false;u.pending=false;u.updatedAt=Date.now();pushNotify({to:u.name,kind:'sys',title:'账号注销',content:`${u.name}，您的志愿者账号已被管理员注销，不可再登录；如有疑问请联系管理员。`});n++;pushLog('注销',`批量注销 ${u.name}`);}});saveDB();if(window.ZY)ZY.push();closeModal();filesSearch();toast('已注销 '+n+' 人，已同步到云端并通知本人','ok')},'批量注销');};
 };
 window.viewSecret=function(id){
   if(!canEdit())return toast('仅管理员可查看成员密钥','err');
@@ -1191,7 +1209,7 @@ window.viewPaper=function(id){
     ${list.length?`<div class="paper-grid">${list.map(f=>f.dataUrl&&f.type&&f.type.indexOf('image/')===0?`<div class="paper-item" onclick="viewImg('${f.dataUrl}')" title="${esc(f.name)}"><img src="${f.dataUrl}"><span class="paper-name">${esc(f.name)}</span><span class="paper-meta">${esc(f.uploader||'-')} · ${esc((f.time||'').slice(0,10))}</span></div>`:`<div class="paper-file"><a href="${f.dataUrl}" download="${esc(f.name)}">${esc(f.name)}</a><span class="paper-meta">${esc(f.uploader||'-')} · ${esc((f.time||'').slice(0,10))}</span></div>`).join('')}</div>`:'<div class="empty-tip">暂无纸质档案</div>'}
   </div><div class="modal-foot">${canEdit()?`<button class="primary" onclick="uploadPaper('${u.id}')">上传纸质档案</button>`:''}<button class="ghost" data-close-modal>关闭</button></div></div>`);
 };
-window.appointUser=(id)=>{const u=DB.users.find(x=>x.id===id);openModal(`<div class="modal" style="width:480px;"><div class="modal-title"><span class="bar"></span>任命 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid"><label>角色<select id="apRole">${(DB.dictionaries.role||[]).filter(x=>x.val!=='dev').map(r=>`<option value="${r.val}">${r.label}</option>`).join('')}</select></label><label>职位名称<input id="apTitle" value="${esc(u.title||'')}"></label></div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="apSave">确认任命</button></div></div>`);$('#apSave').onclick=()=>{u.role=$('#apRole').value;u.title=$('#apTitle').value;u.position=u.title;u.activated=true;u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();closeModal();filesSearch();toast('任命成功，已同步到云端，对方登录即生效','ok')}};
+window.appointUser=(id)=>{const u=DB.users.find(x=>x.id===id);openModal(`<div class="modal" style="width:480px;"><div class="modal-title"><span class="bar"></span>任命 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid"><label>角色<select id="apRole">${(DB.dictionaries.role||[]).filter(x=>x.val!=='dev').map(r=>`<option value="${r.val}">${r.label}</option>`).join('')}</select></label><label>职位名称<input id="apTitle" value="${esc(u.title||'')}"></label></div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="apSave">确认任命</button></div></div>`);$('#apSave').onclick=()=>{const oldLabel=roleLabel(u.role);u.role=$('#apRole').value;u.title=$('#apTitle').value;u.position=u.title;u.activated=true;u.updatedAt=Date.now();pushNotify({to:u.name,kind:'sys',title:'职位任命',content:`${u.name}，您已被任命为「${u.title||roleLabel(u.role)}」（原${oldLabel}），角色权限已同步到您的账号。`});saveDB();if(window.ZY)ZY.push();closeModal();filesSearch();toast('任命成功，已同步到云端，对方登录即生效并收到通知','ok')}};
 window.openRemoveUser=function(){const candidates=DB.users.filter(u=>u.role!=='dev'&&u.role!=='member'&&u.id!==currentUser.id);if(!candidates.length)return toast('暂无可撤销的管理员','err');openModal(`<div class="modal" style="width:520px;"><div class="modal-title"><span class="bar"></span>撤销职位<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><p class="warn">撤销后降为「志愿者」且停用账号。</p><table class="tbl"><thead><tr><th>姓名</th><th>职位</th><th>专业部</th><th></th></tr></thead><tbody>${candidates.map(u=>`<tr><td>${esc(u.name)}</td><td><span class="role-tag ${roleClass(u.role)}">${esc(roleLabel(u.role))}</span></td><td>${esc(u.dept||'-')}</td><td><button class="warn" onclick="removeUser('${u.id}')" style="height:26px;padding:0 10px;background:#fff;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;border-radius:2px;">撤销</button></td></tr>`).join('')}</tbody></table></div><div class="modal-foot"><button class="ghost" data-close-modal>关闭</button></div></div>`)};
 
 window.exportCertPDF=function(id){

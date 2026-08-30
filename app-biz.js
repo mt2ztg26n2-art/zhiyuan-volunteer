@@ -721,7 +721,7 @@ window.doAppointAdmin=()=>{
   const uid=$('#apUser').value;if(!uid)return toast('请选择人员','err');
   const u=DB.users.find(x=>x.id===uid);const role=$('#apRole2').value;
   const rl=(DB.dictionaries.role.find(r=>r.val===role)||{}).label;
-  confirmDialog(`确认将 <b>${esc(u.name)}</b> 任命为「${rl}」？`,()=>{u.role=role;u.activated=true;u.pending=false;u.status='正常在岗';u.title=rl;u.position=rl;u.updatedAt=Date.now();saveDB();if(window.ZY)ZY.push();pushLog('任命管理员',`任命 ${u.name} 为 ${rl}`);renderSettings($('#viewRoot'));toast('任命成功，已同步到云端，对方登录即生效','ok')},'任命管理员');
+  confirmDialog(`确认将 <b>${esc(u.name)}</b> 任命为「${rl}」？`,()=>{u.role=role;u.activated=true;u.pending=false;u.status='正常在岗';u.title=rl;u.position=rl;u.updatedAt=Date.now();pushNotify({to:u.name,kind:'sys',title:'职位任命',content:`${u.name}，您已被任命为「${rl}」，角色权限已同步到您的账号。`});saveDB();if(window.ZY)ZY.push();pushLog('任命管理员',`任命 ${u.name} 为 ${rl}`);renderSettings($('#viewRoot'));toast('任命成功，已同步到云端，对方登录即生效并收到通知','ok')},'任命管理员');
 };
 window.openTransferBox=function(){const box=$('#transferBox');if(!box)return;box.innerHTML=`<div class="tip-line">将超级管理员权限移交给接班人，原管理员自动降级。</div><div class="form-grid cols-2"><label>选择接班人<select id="trTo">${DB.users.filter(u=>u.id!==currentUser.id&&u.role!=='dev').map(u=>`<option value="${u.id}">${esc(u.name)}（${esc(u.dept||'-')} ${esc(u.cls||'-')}）</option>`).join('')}</select></label><label>原管理员降级为<select id="trFromRole"><option>member</option><option>president</option><option>vice</option><option>minister</option></select></label></div><button class="primary mt-12" style="height:38px;padding:0 24px;" onclick="doTransfer()">确认换届移交</button>`};
 window.addDept=()=>{const name=prompt('请输入新专业部名称：');if(!name)return;if(DB.dictionaries.departments.includes(name))return toast('该专业部已存在','err');DB.dictionaries.departments.push(name);DB.dictionaries.classes[name]=[];saveDB();if(window.ZY)ZY.push();renderDeptMgr();toast('已新增','ok')};
@@ -742,6 +742,8 @@ window.doTransfer=()=>{
   confirmDialog(`确认将超级管理员权限移交给 <b>${esc(to.name)}</b>？移交后您将降级。`,()=>{
     currentUser.role=fromRole;currentUser.title='志愿者';currentUser.position='志愿者';currentUser.updatedAt=Date.now();
     to.role='super';to.title='超级管理员';to.position='会长';to.activated=true;to.updatedAt=Date.now();
+    pushNotify({to:to.name,kind:'sys',title:'权限移交',content:`${to.name}，您已被任命为超级管理员（换届移交），拥有系统最高权限。`});
+    pushNotify({to:currentUser.name,kind:'sys',title:'权限移交',content:`${currentUser.name}，您已将超级管理员权限移交给 ${to.name}，当前角色为「${roleLabel(fromRole)}」。`});
     saveDB();if(window.ZY)ZY.push();toast('换届完成，已同步到云端，请重新登录','ok');setTimeout(()=>{localStorage.removeItem(LS_USR);location.reload()},1200);
   },'确认换届');
 };
@@ -1421,8 +1423,21 @@ window.restoreDemo=function(){
   if(!confirm('确认恢复演示数据？将覆盖当前所有数据为演示状态（含示例档案/活动/服务/通知等），之后可随时点「清除所有演示数据」回到纯净。建议先导出 Excel 备份！')) return;
   if(!window.buildDemoData){ toast('演示数据模块未加载，请强刷页面','err'); return; }
   DB=normalizeDB(buildDemoData());
+  /* v19.14：解除与演示数据相关的墓碑——先本地 untomb，再 untombPush 移除云端墓碑，
+     否则刚「清除」过的记录会被墓碑过滤掉，恢复不回来。 */
+  const untombKeys=[];
+  try{
+    if(window.ZY && ZY.untomb){
+      (DB.users||[]).forEach(u=>{ if(u.idCard){ ZY.untomb('users', u.idCard); untombKeys.push('users:'+u.idCard); } });
+      ['activities','services','tasks','news','notifies','broadcastRecs','etiquetteRecs','subleagueRecs','quotas','evaluations','reports','summaries','logs','traces'].forEach(k=>{
+        (DB[k]||[]).forEach(x=>{ if(x&&x.id){ ZY.untomb(k, x.id); untombKeys.push(k+':'+x.id); } });
+      });
+    }
+  }catch(e){}
   saveDB();
   try{ if(window.ZY) ZY.push(); }catch(e){}
+  /* 移除云端墓碑（异步等待结果，避免恢复的数据再次被墓碑过滤） */
+  if(window.ZY && ZY.untombPush && untombKeys.length){ ZY.untombPush(untombKeys).then(r=>{ if(!r.ok) console.warn('untombPush:', r); }).catch(()=>{}); }
   if(window.renderRoute) renderRoute();
   if(window.updateNotifyBadge) updateNotifyBadge();
   if(window.buildSidebar) buildSidebar();
@@ -1431,8 +1446,22 @@ window.restoreDemo=function(){
 window.clearAllDemo=async function(){
   if(!confirm('确认清除所有演示数据？将清空档案/活动/服务/任务/通知/总结/名额等全部业务数据，只保留系统账号与词典结构，方便录入你的真实数据。该操作不可恢复，请先导出 Excel 备份！')) return;
   const sysIds=['u-super','u-term','u-dev'];
+  const bizKeys=['activities','services','tasks','news','notifies','broadcastRecs','etiquetteRecs','subleagueRecs','quotas','evaluations','reports','summaries','logs','traces'];
+  /* v19.14 关键：先给被删除的记录打「墓碑」再清空。
+   * clearAllDemo 的 ZY.push 是合并式上传（先拉云端再 union），若不打墓碑，
+   * 云端/其它设备里残留的旧演示数据会在合并时被重新加回来 → 永远清不干净。
+   * 墓碑会随合并传播到所有设备：旧数据在任何设备上都会被永久过滤（90 天内），
+   * 真正实现"清除一次，全网干净"。 */
+  const removedUsers=(DB.users||[]).filter(u=>!sysIds.includes(u.id));
+  const removedBiz={}; bizKeys.forEach(k=>{ removedBiz[k]=DB[k]||[]; });
+  try{
+    if(window.ZY && ZY.tomb){
+      removedUsers.forEach(u=>{ if(u.idCard) ZY.tomb('users', u.idCard); });
+      bizKeys.forEach(k=>{ (removedBiz[k]||[]).forEach(x=>{ if(x&&x.id) ZY.tomb(k, x.id); }); });
+    }
+  }catch(e){}
   DB.users=(DB.users||[]).filter(u=>sysIds.includes(u.id));
-  ['activities','services','tasks','news','notifies','broadcastRecs','etiquetteRecs','subleagueRecs','quotas','evaluations','reports','summaries','logs','traces'].forEach(k=>{ DB[k]=[]; });
+  bizKeys.forEach(k=>{ DB[k]=[]; });
   DB.nextIds={user:100,service:10,activity:10,task:10,news:10,notify:10,summary:10,report:10};
   saveDB();
   /* 关键修复：必须等待云端上传完成再返回，否则退出登录/刷新会把"清空"打断，
@@ -1449,7 +1478,7 @@ window.clearAllDemo=async function(){
   if(window.renderRoute) renderRoute();
   if(window.updateNotifyBadge) updateNotifyBadge();
   if(window.buildSidebar) buildSidebar();
-  toast('已清除所有演示数据并同步云端，可直接录入真实数据','ok');
+  toast('已清除所有演示数据并同步云端（含全网墓碑，不再复活），可直接录入真实数据','ok');
 };
 
 /* 启动入口：app.js 与 app-biz.js 均已加载完成后执行 */

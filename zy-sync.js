@@ -277,6 +277,38 @@ window.ZY = (function(){
     try{ if(window.saveDB) window.saveDB(); }catch(e){}
     markDirty();
   }
+  /* v19.14 解除墓碑：清除数据后同一身份证重新注册 / 恢复演示数据时需要，
+   * 否则合并时新记录会被旧墓碑过滤掉而"消失"。 */
+  function untomb(type, key){
+    if(!window.DB || !window.DB._tomb || !key) return;
+    delete window.DB._tomb[tombKey(type,key)];
+    try{ if(window.saveDB) window.saveDB(); }catch(e){}
+    markDirty();
+  }
+  /* v19.14：批量「解除墓碑并上传」——恢复演示数据 / 同一身份证重新注册时使用。
+   * 普通 untomb 只删本机墓碑，云端墓碑还在，下次合并又会被加回来。
+   * 这里：把本地/云端副本中的指定墓碑键都剔除后再合并上传（必须在 mergeDB 之前剔除，
+   * 否则 mergeTombs 会把云端墓碑并回来，新记录在合并阶段就被过滤掉）。 */
+  async function untombPush(keys){
+    try{
+      const p=await pullRaw();
+      if(!p.ok) return {ok:false, msg:p.msg||'拉取失败'};
+      const base=(p.ok&&!p.empty&&p.data)?p.data:{};
+      const localDB=window.DB||{};
+      const strip=o=>{ const c=JSON.parse(JSON.stringify(o||{})); if(c&&c._tomb){ (keys||[]).forEach(k=>{ if(k) delete c._tomb[k]; }); } return c; };
+      const merged=mergeDB(strip(localDB), strip(base));
+      if(!merged._tomb) merged._tomb={};
+      (keys||[]).forEach(k=>{ if(k) delete merged._tomb[k]; });
+      const enc=await encrypt(merged);
+      const prevTs=(p.tsRaw!=null)?p.tsRaw:null;
+      const res=(prevTs!=null)?await httpPatch(prevTs,enc):await httpPost({id:1,data:enc});
+      if(res.ok && res.rows.length){
+        lastRemoteTs=tsOf(res.rows[res.rows.length-1]); saveLast(); setState('ok');
+        return {ok:true};
+      }
+      return {ok:false, msg:'并发冲突，请重试'};
+    }catch(e){ return {ok:false, msg:e.message}; }
+  }
   function tombMany(type, keys){
     if(!window.DB) return;
     if(!window.DB._tomb) window.DB._tomb={};
@@ -420,7 +452,7 @@ window.ZY = (function(){
 
   return {
     pull, push: syncOnce, bootstrap, markDirty, startPoll, stopPoll, syncNow, pullMerge,
-    tomb, tombMany, getState,
+    tomb, tombMany, untomb, untombPush, getState,
     get cfg(){ return CFG; }
   };
 })();
