@@ -231,12 +231,11 @@ img{display:block;max-width:100%;}
 .snap-cap{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,transparent,rgba(0,0,0,.58));color:#fff;font-size:12px;padding:18px 8px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .snap-text{display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px;text-align:center;padding:6px;}
 
-/* ============================================ 首页轮播图（12 张图一致随机循环播放） ============================================ */
+/* ============================================ 首页轮播图（12 张图直接切换，无动画，加载快） ============================================ */
 .hero-carousel{position:relative;width:100%;height:360px;overflow:hidden;background:#1a0202;box-shadow:inset 0 0 0 1px #dcdfe6;}
-.hc-track{display:flex;height:100%;width:100%;transition:transform .8s cubic-bezier(.7,0,.3,1);will-change:transform;}
+.hc-track{display:flex;height:100%;width:100%;transition:none;will-change:auto;}
 .hc-slide{position:relative;min-width:100%;height:100%;flex:0 0 100%;}
-.hc-slide img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;animation:hcKenburns 8s ease-in-out infinite alternate;}
-@keyframes hcKenburns{from{transform:scale(1.02);}to{transform:scale(1.12);}}
+.hc-slide img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:none;animation:none;}
 .hc-slide::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.08) 50%,rgba(0,0,0,.45) 100%);}
 
 .hc-dots{position:absolute;left:0;right:0;bottom:14px;display:flex;justify-content:center;gap:8px;z-index:5;}

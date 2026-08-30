@@ -819,14 +819,8 @@ function updateSlide(){
   const track=$('#hcTrack'); if(!track) return;
   const offset=-_hcIdx*100;
   track.style.transform=`translateX(${offset}%)`;
-  /* 懒加载当前图 + 相邻图（首屏只加载 1 张，避免 12 张 2.4MB 全加载） */
-  const slides=track.querySelectorAll('.hc-slide');
-  slides.forEach((sl,i)=>{
-    if(Math.abs(i-_hcIdx)<=1){
-      const img=sl.querySelector('img');
-      if(img && img.dataset.src && !img.src){ img.src=img.dataset.src; }
-    }
-  });
+  /* 预加载剩余图片（首屏后立即加载全部，保证切换瞬间出图） */
+  track.querySelectorAll('img').forEach(img=>{ if(img.dataset.src && !img.src){ img.src=img.dataset.src; } });
   /* 更新圆点 */
   document.querySelectorAll('.hc-dot').forEach((d,i)=>d.classList.toggle('active',i===_hcIdx));
 }
