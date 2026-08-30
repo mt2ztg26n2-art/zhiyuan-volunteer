@@ -238,7 +238,7 @@ img{display:block;max-width:100%;}
 .hc-slide img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;animation:hcKenburns 8s ease-in-out infinite alternate;}
 @keyframes hcKenburns{from{transform:scale(1.02);}to{transform:scale(1.12);}}
 .hc-slide::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.08) 50%,rgba(0,0,0,.45) 100%);}
-.hc-caption{position:absolute;left:24px;bottom:52px;color:#fff;font-size:18px;font-weight:600;letter-spacing:.04em;text-shadow:0 2px 12px rgba(0,0,0,.7);background:rgba(0,0,0,.32);backdrop-filter:blur(8px);padding:8px 18px;border-radius:2px;border-left:3px solid #c8161d;transition:transform .8s;}
+
 .hc-dots{position:absolute;left:0;right:0;bottom:14px;display:flex;justify-content:center;gap:8px;z-index:5;}
 .hc-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.5);cursor:pointer;transition:all .25s;box-shadow:0 1px 3px rgba(0,0,0,.4);}
 .hc-dot.active{background:#c8161d;width:28px;border-radius:5px;box-shadow:0 0 8px rgba(200,22,29,.6);}
@@ -250,7 +250,7 @@ img{display:block;max-width:100%;}
 .hc-prev:hover,.hc-next:hover{background:rgba(200,22,29,.85);}
 @media (max-width:768px){
   .hero-carousel{height:220px;}
-  .hc-caption{font-size:13px;left:12px;bottom:42px;padding:5px 12px;}
+
   .hc-prev,.hc-next{width:36px;height:36px;font-size:22px;}
   .hc-dot{width:8px;height:8px;}
   .hc-dot.active{width:20px;}

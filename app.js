@@ -151,25 +151,8 @@ function normalizeDB(db){
   if(!db.evaluations) db.evaluations=[];
   if(!db.quotas) db.quotas=[];
   if(!db.nextIds) db.nextIds={};
-  /* v18 演示数据自动注入：仅当业务数据完全为空时注入一次（不覆盖已录入的真实数据），
-     解决"终端管理员登录后看不到演示数据"的问题；已录真实数据的不注入 */
-  if((db.activities||[]).length===0 && (db.services||[]).length===0 && !db._demoV){
-    const sd=seedDB();
-    db.activities=sd.activities||[];
-    db.services=sd.services||[];
-    if(!(db.tasks||[]).length) db.tasks=sd.tasks||[];
-    if(!(db.broadcastRecs||[]).length) db.broadcastRecs=sd.broadcastRecs||[];
-    if(!(db.etiquetteRecs||[]).length) db.etiquetteRecs=sd.etiquetteRecs||[];
-    if(!(db.subleagueRecs||[]).length) db.subleagueRecs=sd.subleagueRecs||[];
-    if(!(db.quotas||[]).length) db.quotas=sd.quotas||[];
-    if(!(db.news||[]).length) db.news=sd.news||[];
-    if(!(db.notifies||[]).length) db.notifies=sd.notifies||[];
-    db._demoV=1;
-  }
-  // 角色体系：终端管理员=系统最高权限；移除此前注入的 u-system 中间角色账号
-  db.users=(db.users||[]).filter(u=>u.id!=='u-system');
+  /* 演示数据不再自动注入（用户要求纯净系统，自己录入真实数据） */
   // 字典增量合并：保留用户已有数据，向 organizations/positions/classes 追加新条目（不覆盖）
-  const seed=seedDB();
   const orgs=new Set([...(db.dictionaries.organizations||[]),...(seed.dictionaries.organizations||[])]);
   db.dictionaries.organizations=[...orgs];
   if(db.dictionaries.classes){
@@ -770,7 +753,7 @@ function renderDashboard(root){
   root.innerHTML=`
     <div class="notice-strip"><span class="label">系统公告</span><span class="ct">欢迎进入 <b>宣汉职校志愿服务智慧管理平台</b>；今日 ${fmtDate(now())} · ${esc(DB.period)} · ${esc(DB.school)}</span><span class="time">单机版 · 即开即用</span></div>
     <div class="stat-row">${stats.map(s=>`<div class="stat-card"><div class="stat-icon ${s.cls}">${s.icon}</div><div class="stat-meta"><div class="stat-label">${esc(s.label)}</div><div class="stat-value">${s.value}<span class="unit">${esc(s.unit)}</span></div><div class="stat-sub">${esc(s.sub)}</div></div></div>`).join('')}</div>
-    <div class="page-block" id="carouselBlock">${blockHead('志愿风采 · 校园巡礼','')}<div class="block-body" style="padding:0;">
+    <div class="page-block" id="carouselBlock">${blockHead('','')}<div class="block-body" style="padding:0;">
       <div class="hero-carousel" id="heroCarousel">
         <div class="hc-track" id="hcTrack">
           <div class="hc-slide" data-i="1"><img src="carousel/carousel-1.jpg" alt="志愿风采 1"></div>
@@ -786,7 +769,6 @@ function renderDashboard(root){
           <div class="hc-slide" data-i="11"><img data-src="carousel/carousel-11.jpg" alt="志愿风采 11"></div>
           <div class="hc-slide" data-i="12"><img data-src="carousel/carousel-12.jpg" alt="志愿风采 12"></div>
         </div>
-        <div class="hc-caption" id="hcCaption">志愿风采 · 校园巡礼</div>
         <div class="hc-dots" id="hcDots"></div>
         <button class="hc-prev" id="hcPrev" aria-label="上一张">‹</button>
         <button class="hc-next" id="hcNext" aria-label="下一张">›</button>
@@ -853,16 +835,10 @@ function updateSlide(){
   });
   /* 更新圆点 */
   document.querySelectorAll('.hc-dot').forEach((d,i)=>d.classList.toggle('active',i===_hcIdx));
-  /* 简单图文描述（标题） */
-  const cap=$('#hcCaption'); if(cap){
-    const order=(_hcOrder[_hcIdx]||0)+1;
-    const titles=['红心志愿 · 传递温暖','守护图书 · 知识润心','红色血脉 · 薪火相传','誓言铿锵 · 青春向党','社区服务 · 敬老助老','五四诵唱 · 志愿护航','雷锋精神 · 时代相传','青年先锋 · 团徽闪耀','校园文化 · 绿树成荫','桃李芬芳 · 立德树人','绿叶行动 · 守护家园','入团誓词 · 永葆初心'];
-    cap.textContent='【'+order+'/12】'+titles[_hcOrder[_hcIdx]||0];
-  }
 }
 function resetTimer(){
   if(_hcTimer) clearInterval(_hcTimer);
-  _hcTimer=setInterval(()=>{_hcIdx=(_hcIdx+1)%_hcOrder.length; updateSlide();}, 4500);
+  _hcTimer=setInterval(()=>{_hcIdx=(_hcIdx+1)%_hcOrder.length; updateSlide();}, 2500);
 }
 
 function renderRankTrapezoid(){
