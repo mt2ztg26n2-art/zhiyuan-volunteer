@@ -14,7 +14,11 @@ window.addEventListener('error', function(e){
 });
 const LS_KEY = 'XHZZ_VOL_DB_v3';
 const LS_USR = 'XHZZ_VOL_USER_v3';
-let DB = null;
+/* 【v19.3 关键修复】DB 必须用 var 挂到 window：zy-sync.js 的 push/pull 全程读写
+ * window.DB，而 let 声明的顶层变量不会成为 window 属性 → 同步层读到的永远是
+ * undefined（上传空对象），云端永远被清空，管理员端永远看不到注册/审核/通知。
+ * var 声明的全局变量自动挂到 window，与同步层读写完全同步。 */
+var DB = null;
 let currentUser = null;
 
 function seedDB(){
