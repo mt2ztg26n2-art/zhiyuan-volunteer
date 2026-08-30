@@ -774,17 +774,17 @@ function renderDashboard(root){
       <div class="hero-carousel" id="heroCarousel">
         <div class="hc-track" id="hcTrack">
           <div class="hc-slide" data-i="1"><img src="carousel/carousel-1.jpg" alt="志愿风采 1"></div>
-          <div class="hc-slide" data-i="2"><img src="carousel/carousel-2.jpg" alt="志愿风采 2"></div>
-          <div class="hc-slide" data-i="3"><img src="carousel/carousel-3.jpg" alt="志愿风采 3"></div>
-          <div class="hc-slide" data-i="4"><img src="carousel/carousel-4.jpg" alt="志愿风采 4"></div>
-          <div class="hc-slide" data-i="5"><img src="carousel/carousel-5.jpg" alt="志愿风采 5"></div>
-          <div class="hc-slide" data-i="6"><img src="carousel/carousel-6.jpg" alt="志愿风采 6"></div>
-          <div class="hc-slide" data-i="7"><img src="carousel/carousel-7.jpg" alt="志愿风采 7"></div>
-          <div class="hc-slide" data-i="8"><img src="carousel/carousel-8.jpg" alt="志愿风采 8"></div>
-          <div class="hc-slide" data-i="9"><img src="carousel/carousel-9.jpg" alt="志愿风采 9"></div>
-          <div class="hc-slide" data-i="10"><img src="carousel/carousel-10.jpg" alt="志愿风采 10"></div>
-          <div class="hc-slide" data-i="11"><img src="carousel/carousel-11.jpg" alt="志愿风采 11"></div>
-          <div class="hc-slide" data-i="12"><img src="carousel/carousel-12.jpg" alt="志愿风采 12"></div>
+          <div class="hc-slide" data-i="2"><img data-src="carousel/carousel-2.jpg" alt="志愿风采 2"></div>
+          <div class="hc-slide" data-i="3"><img data-src="carousel/carousel-3.jpg" alt="志愿风采 3"></div>
+          <div class="hc-slide" data-i="4"><img data-src="carousel/carousel-4.jpg" alt="志愿风采 4"></div>
+          <div class="hc-slide" data-i="5"><img data-src="carousel/carousel-5.jpg" alt="志愿风采 5"></div>
+          <div class="hc-slide" data-i="6"><img data-src="carousel/carousel-6.jpg" alt="志愿风采 6"></div>
+          <div class="hc-slide" data-i="7"><img data-src="carousel/carousel-7.jpg" alt="志愿风采 7"></div>
+          <div class="hc-slide" data-i="8"><img data-src="carousel/carousel-8.jpg" alt="志愿风采 8"></div>
+          <div class="hc-slide" data-i="9"><img data-src="carousel/carousel-9.jpg" alt="志愿风采 9"></div>
+          <div class="hc-slide" data-i="10"><img data-src="carousel/carousel-10.jpg" alt="志愿风采 10"></div>
+          <div class="hc-slide" data-i="11"><img data-src="carousel/carousel-11.jpg" alt="志愿风采 11"></div>
+          <div class="hc-slide" data-i="12"><img data-src="carousel/carousel-12.jpg" alt="志愿风采 12"></div>
         </div>
         <div class="hc-caption" id="hcCaption">志愿风采 · 校园巡礼</div>
         <div class="hc-dots" id="hcDots"></div>
@@ -843,6 +843,14 @@ function updateSlide(){
   const track=$('#hcTrack'); if(!track) return;
   const offset=-_hcIdx*100;
   track.style.transform=`translateX(${offset}%)`;
+  /* 懒加载当前图 + 相邻图（首屏只加载 1 张，避免 12 张 2.4MB 全加载） */
+  const slides=track.querySelectorAll('.hc-slide');
+  slides.forEach((sl,i)=>{
+    if(Math.abs(i-_hcIdx)<=1){
+      const img=sl.querySelector('img');
+      if(img && img.dataset.src && !img.src){ img.src=img.dataset.src; }
+    }
+  });
   /* 更新圆点 */
   document.querySelectorAll('.hc-dot').forEach((d,i)=>d.classList.toggle('active',i===_hcIdx));
   /* 简单图文描述（标题） */

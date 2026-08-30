@@ -28,7 +28,7 @@ img{display:block;max-width:100%;}
 
 /* ============================================ 登录页（全屏背景图 + 徽章 + 垂直堆叠布局） ============================================ */
 .login{min-height:100vh;width:100%;display:flex;flex-direction:column;position:relative;overflow-y:auto;overflow-x:hidden;background:#80070e;}
-.login-bg{position:absolute;inset:0;background:url(login-bg.png) center/cover no-repeat;animation:slowzoom 26s ease-in-out infinite alternate;}
+.login-bg{position:absolute;inset:0;background:url(login-bg.jpg) center/cover no-repeat;animation:slowzoom 26s ease-in-out infinite alternate;}
 @keyframes slowzoom{from{transform:scale(1)}to{transform:scale(1.07)}}
 .login-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg, rgba(112,6,12,.78) 0%, rgba(112,6,12,.55) 50%, rgba(112,6,12,.72) 100%);}
 

@@ -25,13 +25,16 @@ window.ZY = (function(){
   let lastSync = Number(localStorage.getItem(LS_LAST) || 0);
 
   /* ---------- 加解密（AES-GCM，内置密钥 PBKDF2 派生） ---------- */
+  let _keyCache=null;
   async function deriveKey(){
+    if(_keyCache) return _keyCache;
     const enc = new TextEncoder();
     const base = await crypto.subtle.importKey('raw', enc.encode(CFG.pass), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey(
+    _keyCache = await crypto.subtle.deriveKey(
       {name:'PBKDF2', salt:enc.encode(CFG.salt), iterations:120000, hash:'SHA-256'},
       base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']
     );
+    return _keyCache;
   }
   function bufToB64(buf){ let s=''; const ch=0x8000; for(let i=0;i<buf.length;i+=ch) s+=String.fromCharCode.apply(null,buf.subarray(i,i+ch)); return btoa(s); }
   function b64ToBuf(b64){ const bin=atob(b64); const buf=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i); return buf; }
