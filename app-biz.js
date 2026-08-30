@@ -237,7 +237,7 @@ window.zySyncRegs=async function(silent){
     /* 3) 有变化就保存、发通知、刷新界面 */
     if(added || mainAdded>0){
       saveDB();
-      if(window.pushNotify) pushNotify({to:'超级管理员',kind:'audit',title:'新注册待审核',content:(first||'有学员')+' 提交注册申请，请到审核中心处理'});
+      if(window.pushNotify) pushNotify({to:['超级管理员','终端管理员','会 长'],kind:'audit',title:'新注册待审核',content:(first||'有学员')+' 提交注册申请，请到审核中心处理'});
       if(window.updateNotifyBadge) updateNotifyBadge();
       const rt=window.currentRoute?currentRoute():'';
       if(rt==='audit'&&window.renderAudit&&$('#viewRoot')) renderAudit($('#viewRoot'));
@@ -424,7 +424,7 @@ window.actSignup=(id)=>{
     a.signups.push({name,idCard,cls:$('#sgCls').value,dept:$('#sgDept').value,phone:$('#sgPhone').value,time:now()});
     pushNotify({to:'会 长',kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
     pushNotify({to:'副 会 长',kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
-    pushNotify({to:'超级管理员',kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
+    pushNotify({to:['超级管理员','终端管理员','会 长'],kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
     saveDB();if(window.ZY)ZY.push();closeModal();renderActivities($('#viewRoot'));toast('报名成功','ok');
   };
 };
@@ -508,7 +508,7 @@ window.taskSignup=(id)=>{
     t.signups.push({name,idCard:currentUser.idCard,cls:$('#tkCls').value,dept:$('#tkDept').value,phone:$('#tkPhone').value,note:$('#tkNote').value,time:now()});
     pushNotify({to:'会 长',kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
     pushNotify({to:'副 会 长',kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
-    pushNotify({to:'超级管理员',kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
+    pushNotify({to:['超级管理员','终端管理员','会 长'],kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
     saveDB();if(window.ZY)ZY.push();closeModal();renderTasks($('#viewRoot'));toast('报名成功，已同步至会长/副会长/超管','ok');
   };
 };

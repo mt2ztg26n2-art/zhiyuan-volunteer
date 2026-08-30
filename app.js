@@ -560,8 +560,7 @@ function doRegister(){
     DB.users.push({id:'u-'+next,idCard:id,pwd,role:'member',org:$('#rOrg').value,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now()});
     saveDB();
     pushLog('注册',`新注册 ${name}，待审核`);
-    pushNotify({to:'超级管理员',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
-    pushNotify({to:'会 长',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
+    pushNotify({to:['超级管理员','终端管理员','会 长'],kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
     /* 整库同步上云：pending 用户 + 审核通知一并同步，管理员端拉取后立即出现在审核中心、通知中心角标实时变化（统一走 ZY 零配置同步，不再走割裂的 zy_regs 双通道） */
     if(window.ZY){ ZY.push().catch(()=>{}); }
     toast('注册成功！已同步云端，请等待超级管理员审核','ok');$('#registerModal').hidden=true;
@@ -600,7 +599,12 @@ window.pushTrace=function(action,target,before,after,hint){
     DB.traces=DB.traces||[]; DB.traces.unshift(t);if(DB.traces.length>2000)DB.traces.length=2000;saveDB();
   }catch(e){}
 };
-function pushNotify(o){DB.notifies.unshift(Object.assign({id:uid('nt'),time:now(),unread:true,pending:true},o));saveDB();updateNotifyBadge()}
+/* 支持 to 为数组（同时通知多个角色，如 超级管理员/终端管理员/会 长）；数组化后每条通知只挂一个 to，适配通知中心按 roleLabel 过滤 */
+function pushNotify(o){
+  const toArr=Array.isArray(o.to)?o.to:[o.to];
+  toArr.forEach(t=>{ DB.notifies.unshift(Object.assign({id:uid('nt'),time:now(),unread:true,pending:true},o,{to:t})); });
+  saveDB();updateNotifyBadge();
+}
 
 function badgeText(n){
   if(!n) return '';
