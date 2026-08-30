@@ -410,14 +410,13 @@ function renderApp(){
   $('#mainDate').textContent=fmtDate(now())+'  '+new Date().toLocaleTimeString('zh-CN',{hour12:false}); $('#mainPeriod').textContent=DB.period;
   renderRoute(); updateNotifyBadge();
   updateNotifyBadge();
-  /* 部署状态 banner：前端已永久部署，数据同步状态实时呈现（让用户一眼看清进度） */
+  /* 部署状态条：已永久部署 + 云端同步已开启，提示用户去审核中心处理申请 */
   const sb=$('#syncBanner');if(sb){
     const dismissed=DB.settings&&DB.settings.syncBannerDismissed;
     sb.hidden=!!dismissed;
     const close=()=>{sb.hidden=true;DB.settings=DB.settings||{};DB.settings.syncBannerDismissed=true;saveDB()};
     const closeBtn=$('#syncBannerClose');if(closeBtn)closeBtn.onclick=close;
     const dismissBtn=$('#syncBannerDismiss');if(dismissBtn)dismissBtn.onclick=close;
-    const moreBtn=$('#syncBannerMore');if(moreBtn)moreBtn.onclick=openCloudUpgradeModal;
   }
   /* 云端同步：仅管理角色同步全量数据（普通成员只走审核状态通道，不持有全量密文，防信息泄露） */
   const cr=currentUser&&currentUser.role;
@@ -472,11 +471,9 @@ function flushCloudNow(){ try{ if(window.ZY&&window.DB) ZY.markDirty(); }catch(e
 window.flushCloudNow=flushCloudNow;
 
 function showWelcome(name){
-  const ico='<svg viewBox="0 0 24 24" width="46" height="46"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z" fill="#c8161d"/><path d="M8 11l3 3 5-5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const m=document.createElement('div');m.className='mask';
-  m.innerHTML=`<div class="modal" style="max-width:380px"><div class="modal-title"><span class="bar"></span>欢迎<span class="bar"></span><button class="x" data-wclose>×</button></div><div class="modal-body" style="text-align:center;padding:30px 24px"><div style="display:flex;justify-content:center;margin-bottom:8px">${ico}</div><div style="font-size:18px;font-weight:600;color:#c8161d">${esc(name)}，欢迎回到志愿服务平台！</div><div style="color:#888;margin-top:8px;font-size:13px">${fmtDate(now())} · ${esc(DB.period)}</div><div style="margin-top:20px"><button class="primary" data-wclose>进入系统</button></div></div></div>`;
-  document.body.appendChild(m);
-  m.addEventListener('click',e=>{if(e.target===m||e.target.matches('[data-wclose]'))m.remove()});
+  /* 【v19.8 修复】欢迎提示改为 toast 轻提示，不再弹全屏遮罩弹窗挡住页面按钮
+   * （此前弹窗盖住审核中心等菜单，用户首次点击被遮罩吃掉，误以为"按钮点不动"） */
+  toast(`${name}，欢迎回到志愿服务平台`, 'ok');
 }
 function doLogin(){
   const id=$('#loginId').value.trim(),pwd=$('#loginPwd').value,cap=$('#loginCaptcha').value.trim();
