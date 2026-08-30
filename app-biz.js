@@ -703,12 +703,12 @@ window.handleReport=function(id){
 
 /* ============================== 操作日志 ============================== */
 function renderTraces(root){
-  if(!canSeeTrace()){ root.innerHTML='<div class="empty-tip" style="padding:80px;text-align:center;color:var(--ink-3);">您当前角色不可查看痕迹日志<br><span class="f12">（仅终端管理员 / 系统管理员可查看）</span></div>'; return; }
+  if(!canSeeTrace()){ root.innerHTML='<div class="empty-tip" style="padding:80px;text-align:center;color:var(--ink-3);">您当前角色不可查看痕迹日志<br><span class="f12">（仅终端管理员可查看，超级管理员/校团委不可见）</span></div>'; return; }
   const list=DB.traces||[];
   root.innerHTML=`
     <div class="page-block">${blockHead('痕迹日志（<span id="trCount">0</span>）','<button class="ghost" onclick="exportTraces()">导出 Excel</button>')}
       <div class="block-body">
-        <div class="tip-line">记录数据级操作痕迹（修改/删除/审核/任命的<span class="b">前后值差异</span>），便于系统维护时追溯"谁动了哪些数据"。<b>仅终端管理员 / 系统管理员可查看</b>（超级管理员等被设置的角色看不到，避免他们反查终端管理员）。</div>
+        <div class="tip-line">记录数据级操作痕迹（修改/删除/审核/任命的<span class="b">前后值差异</span>），便于系统维护时追溯"谁动了哪些数据"。<b>仅终端管理员（系统最高权限者）可查看</b>；超级管理员（校团委）权限等同但看不到本页，避免他们反查你的维护动作。</div>
         <table class="tbl"><thead><tr><th style="width:140px">时间</th><th style="width:80px">操作人</th><th style="width:90px">角色</th><th style="width:100px">操作</th><th style="width:140px">对象</th><th>前后值差异</th></tr></thead><tbody id="trBody"></tbody></table>
       </div>
     </div>`;

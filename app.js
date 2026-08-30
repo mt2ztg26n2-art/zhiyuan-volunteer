@@ -42,12 +42,11 @@ function seedDB(){
       {id:'u-m7',role:'member',org:'团副总支',name:'何俊杰',idCard:'000000000000000016',pwd:'mem123',phone:'13900000016',title:'副总支成员',avatar:'',dept:'机建',cls:'24级机电1班',gender:'男',nation:'汉族',politics:'共青团员',position:'成员',activated:true},
       {id:'u-m8',role:'member',org:'团副总支',name:'周子昂',idCard:'000000000000000017',pwd:'mem123',phone:'13900000017',title:'副总支成员',avatar:'',dept:'机建',cls:'25级机电1班',gender:'男',nation:'汉族',politics:'群众',position:'成员',activated:true},
       {id:'u-m9',role:'member',org:'团副总支',name:'吴梦洁',idCard:'000000000000000018',pwd:'mem123',phone:'13900000018',title:'副总支成员',avatar:'',dept:'机建',cls:'25级机电2班',gender:'女',nation:'汉族',politics:'共青团员',position:'成员',activated:true},
-      {id:'u-system',role:'system',org:'校团委',name:'系统管理员（本人）',idCard:'000000000000000000',pwd:'sys1234',phone:'13900000000',email:'system@xhzx.edu.cn',title:'系统管理员',avatar:'',dept:'',cls:'',gender:'男',nation:'汉族',politics:'中共党员',position:'系统管理员',activated:true,createdAt:now()},
       {id:'u-dev',role:'dev',org:'开发人员',name:'开发维护',idCard:'000000000000000099',pwd:'dev123',phone:'13900000099',title:'系统开发',avatar:'',dept:'',cls:'',activated:true}
     ],
     dictionaries:{
       role:[
-        {val:'system',label:'系统管理员'},{val:'super',label:'超级管理员'},{val:'terminal',label:'终端管理员'},{val:'president',label:'会 长'},
+        {val:'super',label:'超级管理员'},{val:'terminal',label:'终端管理员'},{val:'president',label:'会 长'},
         {val:'vice',label:'副 会 长'},{val:'minister',label:'部长/站长'},{val:'broadcaster',label:'广播站员'},
         {val:'etiquette',label:'礼仪队员'},{val:'subleague',label:'团副总支'},{val:'member',label:'志愿者'},{val:'dev',label:'开发人员'}
       ],
@@ -167,11 +166,8 @@ function normalizeDB(db){
     if(!(db.notifies||[]).length) db.notifies=sd.notifies||[];
     db._demoV=1;
   }
-  // 系统管理员账号（仅存在一次）：u-system（本人系统级账号）
-  if(!db.users.some(u=>u.id==='u-system')){
-    const sysSeed=(seedDB().users||[]).find(u=>u.id==='u-system');
-    if(sysSeed) db.users.unshift(sysSeed);
-  }
+  // 角色体系：终端管理员=系统最高权限；移除此前注入的 u-system 中间角色账号
+  db.users=(db.users||[]).filter(u=>u.id!=='u-system');
   // 字典增量合并：保留用户已有数据，向 organizations/positions/classes 追加新条目（不覆盖）
   const seed=seedDB();
   const orgs=new Set([...(db.dictionaries.organizations||[]),...(seed.dictionaries.organizations||[])]);
@@ -313,14 +309,13 @@ function confirmDialog(msg,onYes,title){openModal(`<div class="modal" style="wid
 
 
 /* ============================== 角色 ============================== */
-const ROLE_RANK={system:110,super:100,terminal:90,dev:99,president:80,vice:75,minister:73,broadcaster:72,etiquette:72,subleague:72,member:10};
+const ROLE_RANK={super:100,terminal:100,dev:99,president:80,vice:75,minister:73,broadcaster:72,etiquette:72,subleague:72,member:10};
 function canEdit(){return currentUser&&ROLE_RANK[currentUser.role]>=60}
 function isSuper(){return currentUser&&currentUser.role==='super'}
 function isTerminal(){return currentUser&&currentUser.role==='terminal'}
-function isSystem(){return currentUser&&currentUser.role==='system'}
-/* 痕迹日志：只有 system/terminal 可见（最高权限 + 终端管理员），super 等看不到 */
-function canSeeTrace(){return currentUser&&(isSystem()||isTerminal());}
-function isAdmin(){return currentUser&&(isSystem()||isSuper()||isTerminal())}
+/* 痕迹日志：仅终端管理员（系统最高权限者）可见；超级管理员（校团委）看不到 */
+function canSeeTrace(){return isTerminal();}
+function isAdmin(){return currentUser&&(isSuper()||isTerminal())}
 function roleLabel(r){const m=(DB.dictionaries.role||[]).find(x=>x.val===r)||{};return m.label||r}
 function roleClass(r){return['super','terminal','president','vice','minister','broadcaster','etiquette','subleague','member'].includes(r)?r:'member'}
 /* 集成系统模块权限：
@@ -338,7 +333,7 @@ function canSee(route){
   if(route==='etiquette'&&(r==='etiquette'||isAdmin()))return true;
   if(route==='subleague'&&(r==='subleague'||isAdmin()))return true;
   if(route==='quota'&&(isAdmin()||manager||currentUser.role==='member'))return true;
-  /* 痕迹日志：只有 system 最高权限 / terminal 终端管理员 可见（super 等被设置的角色看不到自己被监控的痕迹） */
+  /* 痕迹日志：仅终端管理员（系统最高权限者）可见，超级管理员（校团委）看不到 */
   if(route==='traces')return canSeeTrace();
   return false;
 }
@@ -665,7 +660,7 @@ function doForgot(){
 
 function doLogout(){localStorage.removeItem(LS_USR);toast('已退出登录','ok');location.reload()}
 function pushLog(action,content){DB.logs.unshift({id:uid('l'),time:now(),user:currentUser?currentUser.name:'-',role:currentUser?currentUser.role:'-',action,content});if(DB.logs.length>1000)DB.logs.length=1000;saveDB()}
-/* 痕迹日志：记录数据级操作（前后值差异），仅 system/terminal 可见
+/* 痕迹日志：记录数据级操作（前后值差异），仅终端管理员（系统最高权限者）可见
  * action: 操作类型 如 "审核通过"、"修改档案"、"任命"、"注销"
  * target: 操作对象 "user档案:张三"、"活动:五四诵唱"
  * before/after: 改前/改后快照（自动 JSON.stringify 比较）
