@@ -596,7 +596,11 @@ function renderSettings(root){
     <div class="page-block">${blockHead('部门 / 组织 管理（自定义）','<button onclick="addOrg()">+ 新增部门</button>')}<div class="block-body" id="orgMgr"></div></div>
     ${isSuper()?`<div class="page-block">${blockHead('管理员任命 / 换届','')}<div class="block-body"><div class="tip-line">可任命其他成员为管理员（终端管理员 / 会长 / 副会长 / 部长等），或将超级管理员权限整体移交给接班人。</div><div class="form-grid cols-3"><label>选择人员<select id="apUser">${DB.users.filter(u=>u.role!=='dev'&&u.role!=='super').map(u=>`<option value="${u.id}">${esc(u.name)}（${esc(roleLabel(u.role))}）</option>`).join('')}</select></label><label>任命为<select id="apRole2"><option value="terminal">终端管理员</option><option value="president">会长</option><option value="vice">副会长</option><option value="minister">部长/站长</option><option value="broadcaster">广播站员</option><option value="etiquette">礼仪队员</option><option value="subleague">团副总支</option></select></label><label>操作<div style="height:40px;display:flex;gap:8px;"><button class="primary" style="height:38px;flex:1;" onclick="doAppointAdmin()">任命管理员</button><button class="ghost" style="height:38px;flex:1;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;" onclick="openTransferBox()">换届移交</button></div></label></div><div id="transferBox" class="mt-12"></div></div></div>`:''}
     <div class="page-block" id="zySyncBlock">${blockHead('云端同步（全设备自动同步，零配置）',`<button class="ghost" onclick="zyPullNow()">立即下载云端</button><button class="primary" onclick="zyPushNow()">立即上传本地</button>`)}<div class="block-body"><div class="tip-line" style="margin-bottom:10px;">本平台已部署在 <b>GitHub Pages 永久地址</b>，数据自动同步到你的 Supabase 云端（免费）：<b>手机/电脑/平板所有设备、所有用户自动互通</b>，无需逐台配置；数据以加密形式存储。权限隔离由系统角色/部门规则控制（如宣传部管理员只能看到宣传部档案）。</div><div class="mt-12" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="primary" style="height:38px;padding:0 24px;" onclick="zyPullNow()">从云端拉取（覆盖本机）</button><button class="ghost" style="height:38px;padding:0 24px;" onclick="zyPushNow()">上传本机到云端（覆盖云端）</button><span class="f12 c-3" id="zyStatus">自动同步已启用</span></div><div class="tip-line mt-12" style="font-size:12px;color:var(--ink-3);">· 使用说明：登录后每 15 秒自动与云端同步一次；新增数据自动上传，云端有更新的数据自动拉取。<br>· 「上传本机到云端」用于：以本机数据为准覆盖云端（如本机刚清空演示数据）。<br>· 「从云端拉取」用于：丢弃本机数据，以云端为准。<br>· 若提示「云端数据解密失败」，点「上传本机到云端」覆盖即可（版本更新后需覆盖一次）。</div></div></div>
-    <div class="page-block">${blockHead('数据维护','')}<div class="block-body"><div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;"><button class="warn" style="height:42px;padding:0 28px;font-size:15px;font-weight:600;background:#c8161d;color:#fff;border-radius:2px;box-shadow:0 4px 12px rgba(200,22,29,.25);" onclick="resetDB()">一键清空演示数据，开始录入我的真实数据</button><span class="f12 c-3">清空后恢复初始演示状态（含云端），所有设备同步清空，方便你从零录入自己的真实数据。该操作不可恢复，请先导出 Excel 备份！</span></div></div></div>`;
+    <div class="page-block">${blockHead('数据维护','')}<div class="block-body"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button style="height:42px;padding:0 22px;font-size:14px;font-weight:600;background:#2a8a3a;color:#fff;border-radius:2px;box-shadow:0 4px 10px rgba(42,138,58,.25);" onclick="restoreDemo()">清除数据 · 恢复演示数据</button>
+      <button style="height:42px;padding:0 22px;font-size:14px;font-weight:600;background:#c8161d;color:#fff;border-radius:2px;box-shadow:0 4px 12px rgba(200,22,29,.25);" onclick="clearAllDemo()">清除所有演示数据（开始录入真实数据）</button>
+      <span class="f12 c-3">「恢复演示数据」一键回到含示例数据的演示状态（便于展示/测试）；「清除所有演示数据」清空全部业务数据（只保留系统账号与词典结构），即可录入你自己的真实档案。两个操作<b>均不退出系统</b>，点击后直接生效。</span>
+    </div></div></div>`;
   renderGradeMgr();renderDeptMgr();renderOrgMgr();
 }
 window.saveRules=()=>{DB.rules.scorePerPerson=parseFloat($('#setScore').value)||0.1;DB.rules.deptMultiplier=parseFloat($('#setMul').value)||0.5;saveDB();toast('评分规则已保存','ok')};
@@ -1154,6 +1158,32 @@ window.openQuotaForm=function(){
 window.quotaSubmit=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;q.status='review';q.trace=q.trace||[];q.trace.push({act:'送审',st:'review',time:now(),by:currentUser.name});saveDB();pushNotify({to:'超级管理员',kind:'audit',title:'团员名额送审',content:`${q.name} 的名额申请已送审，请到审核中心处理`});pushNotify({to:'终端管理员',kind:'audit',title:'团员名额送审',content:`${q.name} 的名额申请已送审，请到审核中心处理`});pushLog('团员名额','送审 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已送审','ok')};
 window.quotaApprove=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;q.status='approved';q.trace=q.trace||[];q.trace.push({act:'审核通过',st:'approved',time:now(),by:currentUser.name});saveDB();pushNotify({to:q.name,kind:'sys',title:'团员名额通过',content:`您（${q.name}）的团员名额申请已通过审核。`});pushLog('团员名额','通过 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已通过','ok')};
 window.quotaReject=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;const r=prompt('驳回原因：');q.status='rejected';q.trace=q.trace||[];q.trace.push({act:'驳回'+(r?('：'+r):''),st:'rejected',time:now(),by:currentUser.name});saveDB();pushNotify({to:q.name,kind:'sys',title:'团员名额驳回',content:`您（${q.name}）的团员名额申请未通过${r?('：'+r):''}。`});pushLog('团员名额','驳回 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已驳回','ok')};
+
+/* ============================== 数据维护：恢复演示数据 / 清除所有演示数据（不退出系统） ============================== */
+window.restoreDemo=function(){
+  if(!confirm('确认恢复演示数据？将覆盖当前所有数据为演示状态（含示例档案/活动/服务/通知等），之后可随时点「清除所有演示数据」回到纯净。建议先导出 Excel 备份！')) return;
+  if(!window.buildDemoData){ toast('演示数据模块未加载，请强刷页面','err'); return; }
+  DB=normalizeDB(buildDemoData());
+  saveDB();
+  try{ if(window.ZY) ZY.push(); }catch(e){}
+  if(window.renderRoute) renderRoute();
+  if(window.updateNotifyBadge) updateNotifyBadge();
+  if(window.buildSidebar) buildSidebar();
+  toast('已恢复演示数据（演示模式）','ok');
+};
+window.clearAllDemo=function(){
+  if(!confirm('确认清除所有演示数据？将清空档案/活动/服务/任务/通知/总结/名额等全部业务数据，只保留系统账号与词典结构，方便录入你的真实数据。该操作不可恢复，请先导出 Excel 备份！')) return;
+  const sysIds=['u-super','u-term','u-dev'];
+  DB.users=(DB.users||[]).filter(u=>sysIds.includes(u.id));
+  ['activities','services','tasks','news','notifies','broadcastRecs','etiquetteRecs','subleagueRecs','quotas','evaluations','reports','summaries','logs','traces'].forEach(k=>{ DB[k]=[]; });
+  DB.nextIds={user:100,service:10,activity:10,task:10,news:10,notify:10,summary:10,report:10};
+  saveDB();
+  try{ if(window.ZY) ZY.push(); }catch(e){}
+  if(window.renderRoute) renderRoute();
+  if(window.updateNotifyBadge) updateNotifyBadge();
+  if(window.buildSidebar) buildSidebar();
+  toast('已清除所有演示数据，可以开始录入你的真实数据','ok');
+};
 
 /* 启动入口：app.js 与 app-biz.js 均已加载完成后执行 */
 boot();
