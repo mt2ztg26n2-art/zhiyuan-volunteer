@@ -186,14 +186,14 @@ function renderAudit(root){
   const pending=DB.users.filter(u=>u.pending);
   const qs=(DB.quotas||[]).filter(q=>q.status==='recommend'||q.status==='review');
   root.innerHTML=`
-    <div class="notice-strip"><span class="label">审核中心</span><span class="ct">统一待办中心：注册审核 + 团员名额申请审核，提交后自动实时同步，审核结果自动通知本人</span></div>
+    <div class="notice-strip"><span class="label">审核中心</span><span class="ct">统一待办中心：注册审核 + 团员名额申请审核，手机端提交的注册会自动实时同步到这里，审核结果自动通知本人</span></div>
     <div class="stat-row">
       <div class="stat-card"><div class="stat-label">待审核注册</div><div class="stat-value">${pending.length}<span class="unit">人</span></div></div>
       <div class="stat-card"><div class="stat-label">待审名额申请</div><div class="stat-value">${qs.length}<span class="unit">件</span></div></div>
       <div class="stat-card"><div class="stat-label">注册总数</div><div class="stat-value">${DB.users.length}<span class="unit">人</span></div></div>
       <div class="stat-card"><div class="stat-label">累计申请</div><div class="stat-value">${(DB.quotas||[]).length}<span class="unit">件</span></div></div>
     </div>
-    <div class="search-bar"><div class="field"><div class="l">身份证号</div><input id="adId" maxlength="18"></div><div class="field"><div class="l">姓名</div><input id="adName"></div><div class="btns"><button onclick="auditQuery()">查 询</button></div></div>
+    <div class="search-bar"><div class="field"><div class="l">身份证号</div><input id="adId" maxlength="18"></div><div class="field"><div class="l">姓名</div><input id="adName"></div><div class="btns"><button onclick="auditQuery()">查 询</button><button class="ghost" onclick="zySyncRegs(true)">同步云端注册</button></div></div>
     <div class="row-2">
       <div class="page-block">${blockHead('待审核注册（'+pending.length+'）','')}<div class="block-body" id="adPending"></div></div>
       <div class="page-block">${blockHead('待审团员名额申请（'+qs.length+'）','')}<div class="block-body" id="adQuota"></div></div>
@@ -201,7 +201,29 @@ function renderAudit(root){
     <div class="page-block">${blockHead('审核查询结果','')}<div class="block-body" id="adResult"><div class="empty-tip">输入身份证号 + 姓名查询档案</div></div></div>`;
   renderAuditPending();
   renderAuditQuota();
+  /* 自动拉取云端注册（手机端提交的）合并进审核中心 */
+  zySyncRegs(false);
 }
+/* 拉取 Supabase 注册队列并合并进本地待审核（手机端注册 → 电脑端审核的关键通道） */
+window.zySyncRegs=async function(silent){
+  try{
+    if(!window.ZYReg||!window.ZY) return;
+    if(!ZY.token){ if(!silent) toast('未连接云端：请先在系统设置配置云端同步','err'); return; }
+    const res=await ZYReg.listAuth();
+    if(!res.ok){ if(!silent) toast('云端注册拉取失败：'+(res.msg||''),'err'); return; }
+    let added=0;
+    (res.list||[]).forEach(r=>{
+      const d=r.data||{};
+      if(!d.idCard||!d.name) return;
+      if(DB.users.some(u=>u.idCard===d.idCard)) return; // 已存在（含已处理）跳过
+      const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
+      DB.users.push({id:'u-'+next,idCard:d.idCard,pwd:d.pwd||'123456',role:'member',org:d.org||'青年志愿者协会',name:d.name,gender:d.gender||'',birth:d.birth||'',nation:d.nation||'',politics:d.politics||'',religion:d.religion||'',school:d.school||'',dept:d.dept||'',cls:d.cls||'',grade:(window.deriveGrade?deriveGrade(d.cls):'')||'',phone:d.phone||'',email:d.email||'',qq:d.qq||'',wechat:d.wechat||'',native:d.native||'',addr:d.addr||'',title:d.title||'青年志愿者',avatar:d.avatar||'',exp:d.exp||'',position:'志愿者',activated:false,pending:true,createdAt:d.createdAt||now(),_cloudRegId:r.id});
+      added++;
+    });
+    if(added){ saveDB(); if(window.renderAuditPending) renderAuditPending(); if(!silent) toast('已同步 '+added+' 条云端注册','ok'); }
+    else if(!silent) toast('云端无新注册','ok');
+  }catch(e){ if(!silent) toast('云端注册同步异常：'+e.message,'err'); }
+};
 function renderAuditPending(){
   const pending=DB.users.filter(u=>u.pending),t=$('#adPending');
   if(!pending.length){t.innerHTML='<div class="empty-tip">暂无待审核注册，新注册提交后会自动出现在这里</div>';return}
@@ -212,8 +234,8 @@ function renderAuditQuota(){
   if(!qs.length){t.innerHTML='<div class="empty-tip">暂无待审名额申请，提交申请后会自动出现在这里</div>';return}
   t.innerHTML=qs.map(q=>`<div style="padding:12px 14px;background:#fff;margin-bottom:10px;border-radius:2px;"><div style="display:flex;justify-content:space-between;"><b>${esc(q.name)}</b><span class="tag ${q.status==='review'?'':'warn'}">${q.status==='review'?'待审核':'待送审'}</span></div><div class="f12 c-3 mt-8">${esc(q.kind||'推荐')} · ${esc(q.dept||'-')} / ${esc(q.cls||'-')} · 提交 ${esc(fmtDateTime(q.createdAt))}</div><div class="f12 c-3">事由：${esc(q.reason||'-')}</div>${(q.trace||[]).length?`<div class="trace mt-8">${q.trace.map(t=>`<span class="trace-dot ${t.st}"></span>${esc(t.act)}·${esc((t.time||'').slice(5,16))}`).join(' ')}</div>`:''}<div class="mt-8" style="display:flex;gap:6px;">${q.status==='recommend'?`<button style="height:28px;padding:0 14px;" onclick="quotaSubmit('${q.id}')">送审</button>`:''}<button class="primary" style="height:28px;padding:0 14px;" onclick="quotaApprove('${q.id}')">通过</button><button class="warn" style="height:28px;padding:0 14px;" onclick="quotaReject('${q.id}')">驳回</button></div></div>`).join('');
 }
-window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');renderAuditPending();toast('已审核通过','ok')}};
-window.auditRejectUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认驳回 <b>${esc(u.name)}</b> 的注册申请？`,()=>{u.pending=false;u.activated=false;saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核驳回',content:`${u.name}，您的注册申请未通过审核，请联系团委管理员。`});pushLog('审核','驳回 '+u.name+' 的注册');renderAuditPending();toast('已驳回','ok')},'驳回注册')};
+window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');/* 云端：写入审核状态 + 删除已处理注册条目 */if(window.ZYStatus)ZYStatus.set(u.idCard,'approved');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已审核通过','ok')}};
+window.auditRejectUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认驳回 <b>${esc(u.name)}</b> 的注册申请？`,()=>{u.pending=false;u.activated=false;saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核驳回',content:`${u.name}，您的注册申请未通过审核，请联系团委管理员。`});pushLog('审核','驳回 '+u.name+' 的注册');if(window.ZYStatus)ZYStatus.set(u.idCard,'rejected');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已驳回','ok')},'驳回注册')};
 window.auditQuery=()=>{
   const id=$('#adId').value.trim(),name=$('#adName').value.trim();
   if(!id||!name)return toast('请同时输入身份证号和姓名','err');

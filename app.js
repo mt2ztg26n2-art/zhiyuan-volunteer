@@ -473,7 +473,28 @@ function doLogin(){
   if(!checkCaptcha(cap)){toast('验证码错误，请重新输入','err');drawCaptcha();$('#loginCaptcha').value='';return}
   const u=DB.users.find(x=>x.idCard===id&&x.pwd===pwd);
   if(!u)return toast('身份证号或密码不正确','err');
-  if(u.activated===false)return toast('账号未激活，请联系管理员','err');
+  if(u.activated===false){
+    /* 云端注册通道：查询审核结果，通过则自动激活登录；未通过/未知则提示 */
+    if(u.pending && window.ZYStatus){
+      ZYStatus.check(id).then(res=>{
+        if(res.ok && res.status==='approved'){
+          u.activated=true; u.pending=false; u.status=u.status||'正常在岗';
+          saveDB(); pushLog('注册',`${u.name} 注册已审核通过，账号自动激活`);
+          toast('审核已通过！欢迎加入','ok');
+          doEnter(u);
+        }else if(res.ok && res.status==='rejected'){
+          toast('注册申请未通过审核，请联系团委管理员','err');
+        }else{
+          toast('账号未激活：注册申请正在审核中，请稍后再试','err');
+        }
+      });
+      return;
+    }
+    return toast('账号未激活，请联系管理员','err');
+  }
+  doEnter(u);
+}
+function doEnter(u){
   currentUser=u; localStorage.setItem(LS_USR,u.id);
   pushLog('登录',`${u.name} 登录`);
   toast('登录成功','ok');
@@ -544,6 +565,14 @@ function doRegister(){
     pushLog('注册',`新注册 ${name}，待审核`);
     pushNotify({to:'超级管理员',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
     pushNotify({to:'会 长',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
+    /* 云端注册通道：同时把注册申请写入 Supabase zy_regs，电脑端管理员自动拉到审核中心 */
+    const regPayload={idCard:id,name,pwd,org:$('#rOrg').value,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,createdAt:now()};
+    if(window.ZYReg){
+      ZYReg.submit(regPayload).then(res=>{
+        if(res.ok){ toast('注册已提交云端，等待审核','ok'); }
+        else { toast('注册已保存本机，云端同步未开启（可在系统设置配置后管理员电脑端查看）','err'); }
+      });
+    }
     toast('注册成功！请等待超级管理员审核','ok');$('#registerModal').hidden=true;
   };
   if(photo){const r=new FileReader();r.onload=()=>finish(r.result);r.readAsDataURL(photo)}else finish('');

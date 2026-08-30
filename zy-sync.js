@@ -171,6 +171,8 @@ window.ZY = (function(){
             if(window._cloudMergeCb) window._cloudMergeCb(p.data, backup);
           }
         }
+        /* 同步云端注册队列（手机端注册 → 电脑端审核中心） */
+        try{ if(window.zySyncRegs) window.zySyncRegs(true); }catch(e){}
       }catch(e){ /* 静默 */ }
     }, 15000);
   }
@@ -205,4 +207,132 @@ window.ZY = (function(){
     get token(){ return token; },
     set token(t){ token = t; }
   };
+})();
+
+/* =========================================================
+ * 注册审核云端通道（手机注册 → 电脑审核）
+ * - zy_regs 表：匿名可提交（手机端注册直接写入），管理员登录后拉取
+ * - 注册数据用「注册密钥」加密存储，防公开读取到敏感信息
+ * ========================================================= */
+window.ZYReg = (function(){
+  'use strict';
+  const REG_KEY = 'zhiyuan-reg-2026-v1';   // 注册数据加密密钥（前端公开但非明文）
+  /* 默认 Supabase 项目（publishable key 本就公开可放前端）；管理员配置优先，否则用默认值保证普通成员也能提交注册 */
+  const DEFAULT_CFG = {
+    url: 'https://naqcaaktfqdvsanghqbm.supabase.co',
+    key: 'sb_publishable_c-JchQzWlsLLz9N_HJoO3A_dDAqc1dB'
+  };
+  function base(){
+    try{
+      const c = (window.ZY && ZY.loadCfg());
+      if(c && c.url && c.key) return {url:c.url, key:c.key};
+    }catch(e){}
+    return DEFAULT_CFG;
+  }
+  async function deriveKey(){
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey('raw', enc.encode(REG_KEY), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      {name:'PBKDF2', salt:enc.encode('zy-reg-v1'), iterations:100000, hash:'SHA-256'},
+      base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']
+    );
+  }
+  function b64ToBuf(b64){ const bin=atob(b64); const buf=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i); return buf; }
+  function bufToB64(buf){ let s=''; const ch=0x8000; for(let i=0;i<buf.length;i+=ch) s+=String.fromCharCode.apply(null,buf.subarray(i,i+ch)); return btoa(s); }
+  async function encrypt(obj){
+    const key=await deriveKey(); const iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(JSON.stringify(obj)));
+    const out=new Uint8Array(12+ct.byteLength); out.set(iv,0); out.set(new Uint8Array(ct),12);
+    return bufToB64(out);
+  }
+  async function decrypt(str){
+    const key=await deriveKey(); const raw=b64ToBuf(str); const iv=raw.slice(0,12);
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, raw.slice(12));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  /* 手机端注册提交：匿名写入 zy_regs（无需管理员 token） */
+  async function submit(payload){
+    const c=base(); if(!c) return {ok:false,msg:'未配置云端'};
+    try{
+      const enc=await encrypt(payload);
+      const r=await fetch(c.url+'/rest/v1/zy_regs', {
+        method:'POST',
+        headers:{'apikey':c.key,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({payload:enc})
+      });
+      if(!r.ok){ const j=await r.json().catch(()=>({})); return {ok:false,msg:j.message||('提交失败 HTTP '+r.status)}; }
+      return {ok:true};
+    }catch(e){ return {ok:false,msg:'网络错误：'+e.message}; }
+  }
+  /* 管理员拉取注册队列（authenticated，RLS 仅管理员可读） */
+  async function listAuth(){
+    const c=base(); if(!c) return {ok:false,msg:'未配置'};
+    if(!ZY.token) return {ok:false,msg:'未登录云端'};
+    try{
+      const r=await fetch(c.url+'/rest/v1/zy_regs?select=id,payload,created_at&order=created_at.desc', {
+        headers:{'apikey':c.key,'Authorization':'Bearer '+ZY.token}
+      });
+      const j=await r.json();
+      if(!r.ok) return {ok:false,msg:j.message||'拉取失败'};
+      const out=[];
+      for(const row of (j||[])){
+        try{ out.push({id:row.id, data:await decrypt(row.payload), created_at:row.created_at}); }
+        catch(e){}
+      }
+      return {ok:true, list:out};
+    }catch(e){ return {ok:false,msg:'网络错误：'+e.message}; }
+  }
+  /* 管理员删除一条已处理的注册（authenticated） */
+  async function remove(id){
+    const c=base(); if(!c || !ZY.token) return {ok:false,msg:'未登录'};
+    try{
+      const r=await fetch(c.url+'/rest/v1/zy_regs?id=eq.'+id, {
+        method:'DELETE',
+        headers:{'apikey':c.key,'Authorization':'Bearer '+ZY.token}
+      });
+      if(!r.ok) return {ok:false,msg:'删除失败 HTTP '+r.status};
+      return {ok:true};
+    }catch(e){ return {ok:false,msg:'网络错误：'+e.message}; }
+  }
+  return { submit, listAuth, remove, decrypt };
+})();
+
+/* =========================================================
+ * 审核状态表（注册者自查：审核通过后可登录）
+ * - zy_status：只有 idCard + status，无敏感信息，匿名可读
+ * - 管理员审核通过/驳回后写入
+ * ========================================================= */
+window.ZYStatus = (function(){
+  'use strict';
+  function base(){
+    try{ const c=(window.ZY&&ZY.loadCfg()); if(c&&c.url&&c.key) return {url:c.url,key:c.key}; }catch(e){}
+    return {url:'https://naqcaaktfqdvsanghqbm.supabase.co', key:'sb_publishable_c-JchQzWlsLLz9N_HJoO3A_dDAqc1dB'};
+  }
+  /* 注册者自查（匿名可读，只返回状态） */
+  async function check(idCard){
+    const c=base();
+    try{
+      const r=await fetch(c.url+'/rest/v1/zy_status?select=status&id_card=eq.'+encodeURIComponent(idCard), {
+        headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}
+      });
+      const j=await r.json();
+      if(!r.ok) return {ok:false};
+      if(!j.length) return {ok:true, status:null};
+      return {ok:true, status:j[0].status};
+    }catch(e){ return {ok:false}; }
+  }
+  /* 管理员写入审核结果（authenticated upsert） */
+  async function set(idCard, status){
+    const c=base(); if(!ZY.token) return {ok:false,msg:'未登录'};
+    try{
+      const r=await fetch(c.url+'/rest/v1/zy_status', {
+        method:'POST',
+        headers:{'apikey':c.key,'Authorization':'Bearer '+ZY.token,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({id_card:idCard, status:status})
+      });
+      if(!r.ok) return {ok:false,msg:'写入失败 HTTP '+r.status};
+      return {ok:true};
+    }catch(e){ return {ok:false,msg:'网络错误：'+e.message}; }
+  }
+  return { check, set };
 })();
