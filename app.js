@@ -817,9 +817,10 @@ function initHeroCarousel(){
 }
 function updateSlide(){
   const track=$('#hcTrack'); if(!track) return;
-  const offset=-_hcIdx*100;
-  track.style.transform=`translateX(${offset}%)`;
-  /* 预加载剩余图片（首屏后立即加载全部，保证切换瞬间出图） */
+  /* 纯 display 切换：无 transform 无动画，物理不卡 */
+  const slides=track.querySelectorAll('.hc-slide');
+  slides.forEach((sl,i)=>{ sl.style.display=(i===_hcIdx?'block':'none'); });
+  /* 预加载全部图片（首屏后立即加载，保证切换秒出） */
   track.querySelectorAll('img').forEach(img=>{ if(img.dataset.src && !img.src){ img.src=img.dataset.src; } });
   /* 更新圆点 */
   document.querySelectorAll('.hc-dot').forEach((d,i)=>d.classList.toggle('active',i===_hcIdx));
