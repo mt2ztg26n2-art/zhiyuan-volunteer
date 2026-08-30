@@ -199,7 +199,7 @@ function hmacSha1(key,msg){
 }
 function hexToBytes(h){const a=[];for(let i=0;i<h.length;i+=2)a.push(parseInt(h.substr(i, 2),16));return a}
 function computeTOTP(secretHex){
-  const t=Math.floor(Date.now()/30000), msg=new Array(8);
+  const t=Math.floor(Date.now()/300000), msg=new Array(8);
   let v=t;for(let i=7;i>=0;i--){msg[i]=v&0xff;v=Math.floor(v/256);}
   const h=hmacSha1(hexToBytes(secretHex),msg);
   const b=[];h.forEach(x=>{b.push((x>>>24)&0xff,(x>>>16)&0xff,(x>>>8)&0xff,x&0xff)});
@@ -553,7 +553,7 @@ function openRegister(){
     <label>所在学校<input id="rSchool" value="${esc(DB.school)}"></label>
     <label>专业部<select id="rDept"><option value="">请选择</option>${(DB.dictionaries.departments||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
     <label>班级<input id="rCls" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
-    <label>所在部门<select id="rOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
+    <label>所在部门<i>*</i><select id="rOrg"><option value="">请选择部门</option>${(DB.dictionaries.organizations||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
     <label>职位/类型<select id="rType"><option>青年志愿者</option><option>广播站成员</option><option>礼仪队成员</option><option>团总支成员</option></select></label>
     <label>登录密码<i>*</i><input id="rPwd" type="password"></label>
     <label>确认密码<i>*</i><input id="rPwd2" type="password"></label>
@@ -574,18 +574,22 @@ function doRegister(){
   if(!name)return toast('请填写姓名','err');
   if(pwd.length<6)return toast('密码至少 6 位','err');
   if(pwd!==pwd2)return toast('两次密码输入不一致','err');
+  const org=$('#rOrg').value.trim();
+  if(!org)return toast('请选择所在部门','err');
   const existUser=DB.users.find(u=>u.idCard===id);
   if(existUser) return toast(existUser.pending?'该身份证号已提交注册，正在审核中':'该身份证号已注册','err');
   const photo=$('#rPhoto').files[0];
   const finish=(avatar)=>{
     const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
-    DB.users.push({id:'u-'+next,idCard:id,pwd,role:'member',org:$('#rOrg').value,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now()});
+    DB.users.push({id:'u-'+next,idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now()});
     saveDB();
     pushLog('注册',`新注册 ${name}，待审核`);
-    pushNotify({to:['超级管理员','终端管理员','会 长'],kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
+    /* 按部门分流通知：本部门管理员才能收到审核通知，超级/终端管理员可收到全部 */
+    const auditTargets=auditNotifyTargets(org);
+    pushNotify({to:auditTargets,org,kind:'audit',title:`【${org}】新注册待审核`,content:`${name} 申请加入「${org}」，请本部门管理员审核`});
     /* 整库同步上云：pending 用户 + 审核通知一并同步，管理员端拉取后立即出现在审核中心、通知中心角标实时变化（统一走 ZY 零配置同步，不再走割裂的 zy_regs 双通道） */
     if(window.ZY){ ZY.push().catch(()=>{}); }
-    toast('注册成功！已同步云端，请等待超级管理员审核','ok');$('#registerModal').hidden=true;
+    toast('注册成功！已同步云端，请等待本部门管理员审核','ok');$('#registerModal').hidden=true;
   };
   if(photo){const r=new FileReader();r.onload=()=>finish(r.result);r.readAsDataURL(photo)}else finish('');
 }
@@ -628,6 +632,26 @@ function pushNotify(o){
   saveDB();updateNotifyBadge();
 }
 
+/* 注册审核按部门分流：哪个部门的成员注册，只通知该部门管理员（含超级/终端可览全部） */
+function auditNotifyTargets(org){
+  const base=['超级管理员','终端管理员'];
+  if(org==='青年志愿者协会') base.push('会 长','副 会 长','部长/站长');
+  else if(org==='广播站') base.push('广播站员','部长/站长');
+  else if(org==='礼仪队') base.push('礼仪队员','部长/站长');
+  else if(org==='团副总支') base.push('团副总支','部长/站长');
+  else base.push('部长/站长');
+  return base;
+}
+/* 当前管理员能否审核/查看某条注册/通知：超级/终端看全部；部门管理员只看本部门 */
+function canAuditUser(u){ return isAdmin() || (currentUser && currentUser.org && u && u.org===currentUser.org); }
+function canSeeNotify(n){
+  if(!currentUser)return false;
+  const toMe=n.to==='all'||n.to===currentUser.name||n.to===roleLabel(currentUser.role);
+  if(!toMe)return false;
+  if(!n.org || isAdmin() || currentUser.org===n.org || n.to===currentUser.name)return true;
+  return false;
+}
+
 function badgeText(n){
   if(!n) return '';
   if(n<=9) return String(n);
@@ -639,7 +663,7 @@ function notifyKindLabel(k){
 }
 function updateNotifyBadge(){
   if(!currentUser)return;
-  const unread=DB.notifies.filter(n=>n.unread===true&&(n.to==='all'||n.to===currentUser.name||n.to===roleLabel(currentUser.role))).length;
+  const unread=DB.notifies.filter(n=>n.unread===true&&canSeeNotify(n)).length;
   const b=$('#tbMsgBadge');if(b){
     b.textContent=badgeText(unread);
     b.style.display=unread?'inline-flex':'none';
@@ -648,7 +672,7 @@ function updateNotifyBadge(){
 }
 function renderNotifyList(tab){
   const box=$('#notifyList');if(!box)return;
-  let list=DB.notifies.filter(n=>n.to==='all'||n.to===currentUser.name||n.to===roleLabel(currentUser.role));
+  let list=DB.notifies.filter(canSeeNotify);
   if(tab==='unread')list=list.filter(n=>n.unread===true);
   else if(tab==='sys')list=list.filter(n=>n.kind==='sys');
   else if(tab==='act')list=list.filter(n=>n.kind==='act'||n.kind==='task');
@@ -819,7 +843,7 @@ function drawChartPol(){const el=$('#chPol');if(!el)return;const map={};DB.users
 function drawChartGen(){const el=$('#chGen');if(!el)return;const ml=['一年级','二年级','三年级'],md=[0,0,0],fd=[0,0,0];DB.users.forEach(u=>{if(u.role==='dev')return;const i=/24/.test(u.cls)?0:1;if(u.gender==='男')md[i]++;else fd[i]++});new Chart(el,{type:'bar',data:{labels:ml,datasets:[{label:'男',data:md,backgroundColor:'#c8161d',borderRadius:4,maxBarThickness:34},{label:'女',data:fd,backgroundColor:'#f0b7ba',borderRadius:4,maxBarThickness:34}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:chartFont(),usePointStyle:true,pointStyle:'circle',boxWidth:7,color:'#5a5a5a'}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:chartFont()}},y:{stacked:true,grid:{color:'#f0f2f5'},ticks:{font:chartFont()}}}}})}
 function renderDashHeat(){const target=$('#dashHeat');if(!target)return;const days=30,td=new Date(),counts={};for(let i=days-1;i>=0;i--){const d=new Date(td);d.setDate(td.getDate()-i);counts[fmtDate(d)]=0}DB.services.forEach(s=>{const k=s.startDT.slice(0,10);if(counts[k]!=null)counts[k]++});const max=Math.max(1,...Object.values(counts));target.innerHTML=`<div class="heat-grid" style="grid-template-columns:repeat(15,1fr);">${Object.entries(counts).map(([k,v])=>{const p=v/max;const color=v===0?'#f2f3f5':`rgba(200,22,29,${0.15+0.75*p})`;return`<span class="day" style="background:${color};" title="${k} · ${v} 人次"><span class="tip">${k} · ${v} 人次</span></span>`}).join('')}</div><div class="heat-legend" style="justify-content:flex-end;">少 <span class="heat-cell" style="background:rgba(200,22,29,.15);"></span><span class="heat-cell" style="background:rgba(200,22,29,.5);"></span><span class="heat-cell" style="background:rgba(200,22,29,.9);"></span> 多</div>`}
 function renderDashNews(pinned,recent){const t=$('#dashNews');if(!t)return;t.innerHTML=`${pinned.map(n=>`<div class="news-pinned"><span class="label">置 顶</span><h2>${esc(n.title)}</h2><div class="meta">${esc(n.publisher)} · ${esc(fmtDateTime(n.publishedAt))} · 阅读 ${n.reads||0}</div></div>`).join('')}<div class="news-grid">${recent.map(n=>`<div class="news-item"><div><span class="date">${esc((n.publishedAt||'').slice(0,10))}</span><span class="ti" onclick="openNews('${n.id}')">${esc(n.title)}</span><span class="role-tag ${n.type==='通报'?'super':'member'}" style="float:right;">${esc(n.type)}</span></div><div class="desc">${esc((n.content||'').slice(0,80))}${(n.content||'').length>80?'…':''}</div></div>`).join('')}</div>`}
-function renderDashNotify(){const t=$('#dashNotify');if(!t)return;const list=DB.notifies.filter(n=>n.unread===true&&(n.to==='all'||n.to===currentUser.name||n.to===roleLabel(currentUser.role))).slice(0,4);if(!list.length){t.innerHTML='<div class="empty-tip">暂无未读通知</div>';return}const routeMap={audit:'audit',act:'activities',task:'tasks',news:'news',sys:'dashboard'};t.innerHTML=list.map(n=>{const r=routeMap[n.kind]||'dashboard';return`<div class="notify-item unread" onclick="goNotify('${n.id}','${r}')"><div class="ti">${esc(n.title)}<time>${esc(fmtDateTime(n.time))}</time></div><div class="ct">${esc(n.content)}</div></div>`}).join('')}
+function renderDashNotify(){const t=$('#dashNotify');if(!t)return;const list=DB.notifies.filter(n=>n.unread===true&&canSeeNotify(n)).slice(0,4);if(!list.length){t.innerHTML='<div class="empty-tip">暂无未读通知</div>';return}const routeMap={audit:'audit',act:'activities',task:'tasks',news:'news',sys:'dashboard'};t.innerHTML=list.map(n=>{const r=routeMap[n.kind]||'dashboard';return`<div class="notify-item unread" onclick="goNotify('${n.id}','${r}')"><div class="ti">${esc(n.title)}<time>${esc(fmtDateTime(n.time))}</time></div><div class="ct">${esc(n.content)}</div></div>`}).join('')}
 
 /* ============================== 档案管理 ============================== */
 let _filesPage=1;
@@ -1045,7 +1069,7 @@ window.viewSecret=function(id){
   const u=DB.users.find(x=>x.id===id);if(!u)return;
   const sec=u.totpSecret||(u.totpSecret=genSecret());
   if(!u.totpSecret){u.totpSecret=sec;saveDB();}
-  const m=openModal(`<div class="modal" style="width:540px;"><div class="modal-title"><span class="bar"></span>成员密钥 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><p class="warn">将密钥告知成员后，成员在登录页「忘记密码」→ 输入身份证号 + 动态口令（每 30 秒更新）即可重置密码。</p><div class="kv mt-12"><div style="grid-column:1/-1"><div class="l">密钥（32 位十六进制串，请告知成员妥善保管）</div><div class="v" style="font-family:Consolas,Monaco,monospace;word-break:break-all;letter-spacing:.05em;background:#fbecee;padding:8px 10px;color:var(--red);">${esc(sec)}</div></div><div style="grid-column:1/-1"><div class="l">当前动态口令（30 秒更新）</div><div class="v" style="font-size:26px;font-weight:700;color:var(--red);letter-spacing:.16em;padding:6px 0;" id="vsCode">${computeTOTP(sec)}</div></div><div><div class="l">姓名</div><div class="v">${esc(u.name)}</div></div><div><div class="l">身份证号</div><div class="v">${esc(u.idCard)}</div></div></div><textarea id="vsSec" style="position:absolute;left:-9999px;top:-9999px;">${esc(sec)}</textarea><div class="mt-16" style="display:flex;gap:8px;"><button class="primary" onclick="var t=document.getElementById('vsSec');t.select();try{document.execCommand('copy');toast('已复制密钥','ok');}catch(_){toast('请手动复制','err');}">复制密钥</button><button class="ghost" data-close-modal>关闭</button></div></div></div>`);
+  const m=openModal(`<div class="modal" style="width:540px;"><div class="modal-title"><span class="bar"></span>成员密钥 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><p class="warn">将密钥告知成员后，成员在登录页「忘记密码」→ 输入身份证号 + 动态口令（每 5 分钟更新）即可重置密码。</p><div class="kv mt-12"><div style="grid-column:1/-1"><div class="l">密钥（32 位十六进制串，请告知成员妥善保管）</div><div class="v" style="font-family:Consolas,Monaco,monospace;word-break:break-all;letter-spacing:.05em;background:#fbecee;padding:8px 10px;color:var(--red);">${esc(sec)}</div></div><div style="grid-column:1/-1"><div class="l">当前动态口令（5 分钟更新）</div><div class="v" style="font-size:26px;font-weight:700;color:var(--red);letter-spacing:.16em;padding:6px 0;" id="vsCode">${computeTOTP(sec)}</div></div><div><div class="l">姓名</div><div class="v">${esc(u.name)}</div></div><div><div class="l">身份证号</div><div class="v">${esc(u.idCard)}</div></div></div><textarea id="vsSec" style="position:absolute;left:-9999px;top:-9999px;">${esc(sec)}</textarea><div class="mt-16" style="display:flex;gap:8px;"><button class="primary" onclick="var t=document.getElementById('vsSec');t.select();try{document.execCommand('copy');toast('已复制密钥','ok');}catch(_){toast('请手动复制','err');}">复制密钥</button><button class="ghost" data-close-modal>关闭</button></div></div></div>`);
   if(m){clearInterval(window._vsT);window._vsT=setInterval(()=>{const e=m.querySelector('#vsCode');if(e)e.textContent=computeTOTP(sec);},1000);}
 };
 window.uploadPaper=function(id){

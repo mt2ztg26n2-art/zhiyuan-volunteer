@@ -181,15 +181,18 @@ window.exportReportPDF=function(){
 
 /* ============================== 审核中心（统一待办：注册审核 + 名额申请审核） ============================== */
 function renderAudit(root){
-  const pending=DB.users.filter(u=>u.pending);
-  const qs=(DB.quotas||[]).filter(q=>q.status==='recommend'||q.status==='review');
+  const pendingAll=DB.users.filter(u=>u.pending);
+  const pending=pendingAll.filter(canAuditUser);
+  const qsAll=(DB.quotas||[]).filter(q=>q.status==='recommend'||q.status==='review');
+  const qs=qsAll.filter(q=>!q.org || canAuditUser({org:q.org}));
+  const scopeText=isAdmin()?'全部部门':('本部门：'+(currentUser.org||'-'));
   root.innerHTML=`
-    <div class="notice-strip"><span class="label">审核中心</span><span class="ct">统一待办中心：注册审核 + 团员名额申请审核，手机端提交的注册会自动实时同步到这里，审核结果自动通知本人</span></div>
+    <div class="notice-strip"><span class="label">审核中心</span><span class="ct">统一待办中心：注册审核 + 团员名额申请审核。已按部门分流，本部门管理员仅处理本部门申请，超级/终端管理员可审全部。</span></div>
     <div class="stat-row">
       <div class="stat-card"><div class="stat-label">待审核注册</div><div class="stat-value">${pending.length}<span class="unit">人</span></div></div>
       <div class="stat-card"><div class="stat-label">待审名额申请</div><div class="stat-value">${qs.length}<span class="unit">件</span></div></div>
       <div class="stat-card"><div class="stat-label">注册总数</div><div class="stat-value">${DB.users.length}<span class="unit">人</span></div></div>
-      <div class="stat-card"><div class="stat-label">累计申请</div><div class="stat-value">${(DB.quotas||[]).length}<span class="unit">件</span></div></div>
+      <div class="stat-card"><div class="stat-label">当前范围</div><div class="stat-value" style="font-size:16px;">${scopeText}</div></div>
     </div>
     <div class="search-bar"><div class="field"><div class="l">身份证号</div><input id="adId" maxlength="18"></div><div class="field"><div class="l">姓名</div><input id="adName"></div><div class="btns"><button onclick="auditQuery()">查 询</button><button class="ghost" onclick="zySyncRegs(true)">同步云端注册</button></div></div>
     <div class="row-2">
@@ -234,10 +237,17 @@ window.zySyncRegs=async function(silent){
     const afterCount=(DB.users||[]).filter(u=>u.pending).length;
     const mainAdded=afterCount-beforeCount;
 
-    /* 3) 有变化就保存、发通知、刷新界面 */
+    /* 3) 有变化就保存、按部门发通知、刷新界面 */
     if(added || mainAdded>0){
       saveDB();
-      if(window.pushNotify) pushNotify({to:['超级管理员','终端管理员','会 长'],kind:'audit',title:'新注册待审核',content:(first||'有学员')+' 提交注册申请，请到审核中心处理'});
+      if(window.pushNotify && window.auditNotifyTargets){
+        /* 兜底通道过来的注册可能缺少 org，按 org 分组后只通知对应部门管理员 */
+        const byOrg={};
+        DB.users.forEach(u=>{ if(u.pending && u.org){ byOrg[u.org]=byOrg[u.org]||[]; byOrg[u.org].push(u.name); } });
+        Object.entries(byOrg).forEach(([org,names])=>{
+          pushNotify({to:auditNotifyTargets(org),org,kind:'audit',title:`【${org}】新注册待审核`,content:(names[0]||'有学员')+(names.length>1?` 等 ${names.length} 人`:'')+' 提交注册申请，请审核'});
+        });
+      }
       if(window.updateNotifyBadge) updateNotifyBadge();
       const rt=window.currentRoute?currentRoute():'';
       if(rt==='audit'&&window.renderAudit&&$('#viewRoot')) renderAudit($('#viewRoot'));
@@ -248,13 +258,13 @@ window.zySyncRegs=async function(silent){
   }catch(e){ if(!silent) toast('云端注册同步异常：'+e.message,'err'); }
 };
 function renderAuditPending(){
-  const pending=DB.users.filter(u=>u.pending),t=$('#adPending');
-  if(!pending.length){t.innerHTML='<div class="empty-tip">暂无待审核注册，新注册提交后会自动出现在这里</div>';return}
+  const pending=DB.users.filter(u=>u.pending&&canAuditUser(u)),t=$('#adPending');
+  if(!pending.length){t.innerHTML='<div class="empty-tip">暂无本部门待审核注册，新注册提交后会自动出现在这里</div>';return}
   t.innerHTML=pending.map(u=>`<div style="padding:12px 14px;background:#fff;margin-bottom:10px;border-radius:2px;"><div style="display:flex;justify-content:space-between;"><b>${esc(u.name)}</b><span class="tag warn">待审核</span></div><div class="f12 c-3 mt-8">身份证：${esc(u.idCard)} · ${esc(u.dept||'-')} · ${esc(u.cls||'-')} · ${esc(u.org||'-')}</div><div class="f12 c-3">电话：${esc(u.phone||'-')} · 提交：${esc(fmtDateTime(u.createdAt))}</div><div class="mt-8" style="display:flex;gap:6px;"><button class="primary" style="height:28px;padding:0 14px;" onclick="auditApprove('${u.id}')">审核通过</button><button class="warn" style="height:28px;padding:0 14px;" onclick="auditRejectUser('${u.id}')">驳回</button><button class="ghost" style="height:28px;padding:0 14px;" onclick="viewFile('${u.id}')">查看档案</button></div></div>`).join('');
 }
 function renderAuditQuota(){
-  const qs=(DB.quotas||[]).filter(q=>q.status==='recommend'||q.status==='review'),t=$('#adQuota');
-  if(!qs.length){t.innerHTML='<div class="empty-tip">暂无待审名额申请，提交申请后会自动出现在这里</div>';return}
+  const qs=(DB.quotas||[]).filter(q=>(q.status==='recommend'||q.status==='review')&&(!q.org || canAuditUser({org:q.org}))),t=$('#adQuota');
+  if(!qs.length){t.innerHTML='<div class="empty-tip">暂无本部门待审名额申请，提交申请后会自动出现在这里</div>';return}
   t.innerHTML=qs.map(q=>`<div style="padding:12px 14px;background:#fff;margin-bottom:10px;border-radius:2px;"><div style="display:flex;justify-content:space-between;"><b>${esc(q.name)}</b><span class="tag ${q.status==='review'?'':'warn'}">${q.status==='review'?'待审核':'待送审'}</span></div><div class="f12 c-3 mt-8">${esc(q.kind||'推荐')} · ${esc(q.dept||'-')} / ${esc(q.cls||'-')} · 提交 ${esc(fmtDateTime(q.createdAt))}</div><div class="f12 c-3">事由：${esc(q.reason||'-')}</div>${(q.trace||[]).length?`<div class="trace mt-8">${q.trace.map(t=>`<span class="trace-dot ${t.st}"></span>${esc(t.act)}·${esc((t.time||'').slice(5,16))}`).join(' ')}</div>`:''}<div class="mt-8" style="display:flex;gap:6px;">${q.status==='recommend'?`<button style="height:28px;padding:0 14px;" onclick="quotaSubmit('${q.id}')">送审</button>`:''}<button class="primary" style="height:28px;padding:0 14px;" onclick="quotaApprove('${q.id}')">通过</button><button class="warn" style="height:28px;padding:0 14px;" onclick="quotaReject('${q.id}')">驳回</button></div></div>`).join('');
 }
 window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){const before={pending:!!u.pending,activated:!!u.activated,status:u.status};u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');pushTrace('审核通过','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:true,status:u.status});/* 云端：写入审核状态 + 删除已处理注册条目 */if(window.ZYStatus)ZYStatus.set(u.idCard,'approved');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);if(window.ZY)ZY.push();renderAuditPending();toast('已审核通过','ok')}};
@@ -745,7 +755,7 @@ function renderMy(root){
       <div class="page-block">${blockHead('我的信息',`<button onclick="openUserForm('${u.id}')">编辑</button>${u.addr?`<button class="ghost" onclick="openMap(this.dataset.a)" data-a="${esc(u.addr)}">地图导航</button>`:''}<button class="ghost" onclick="exportCertPDF('${u.id}')">导出 PDF</button>`)}<div class="block-body"><div class="kv">${[['姓名',u.name],['性别',u.gender],['出生年月',u.birth],['民族',u.nation],['籍贯',u.native],['政治面貌',u.politics],['专业部',u.dept],['班级',u.cls],['职位',u.position],['所在部门',u.org],['联系电话',u.phone],['邮箱',u.email],['身份证号',u.idCard],['所在学校',u.school||DB.school],['居住地址',u.addr],['教育程度',u.edu]].map(([l,v])=>`<div><div class="l">${esc(l)}</div><div class="v">${esc(v||'-')}</div></div>`).join('')}</div></div></div>
       <div class="page-block">${blockHead('我的志愿服务概览','')}<div class="block-body"><div class="stat-row" style="grid-template-columns:1fr 1fr;"><div class="stat-card"><div class="stat-label">服务次数</div><div class="stat-value">${sv.length}<span class="unit">次</span></div></div><div class="stat-card"><div class="stat-label">累计时长</div><div class="stat-value">${total}<span class="unit">小时</span></div></div></div><div class="tip-line">本人仅可查看与自己相关的服务记录与档案。</div></div></div>
     </div>
-    <div class="page-block">${blockHead('动态口令（找回密码用）','')}<div class="block-body"><div class="totp-box"><div class="totp-code" id="myTotp">${computeTOTP(currentUser.totpSecret)}</div><div class="totp-tip">每 30 秒自动更新，找回密码时在登录页「忘记密码」中填入「动态口令」即可重置。</div></div></div></div>
+    <div class="page-block">${blockHead('动态口令（找回密码用）','')}<div class="block-body"><div class="totp-box"><div class="totp-code" id="myTotp">${computeTOTP(currentUser.totpSecret)}</div><div class="totp-tip">每 5 分钟自动更新，找回密码时在登录页「忘记密码」中填入「动态口令」即可重置。</div></div></div></div>
     <div class="page-block">${blockHead('我的服务记录','')}<div class="block-body">${sv.length?`<table class="tbl"><thead><tr><th>序号</th><th>日期</th><th>活动</th><th>地点</th><th>时长(h)</th><th>负责人</th></tr></thead><tbody>${sv.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.startDT.slice(0,10))}</td><td>${esc(s.activity)}</td><td>${esc(s.location)}</td><td>${durationHours(s.startDT,s.endDT)}</td><td>${esc(s.serviceBy)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-tip">暂无服务记录</div>'}</div></div>`;
   clearInterval(window._totpTimer); window._totpTimer=setInterval(()=>{const e=document.getElementById('myTotp');if(e)e.textContent=computeTOTP(currentUser.totpSecret);},1000);
 }

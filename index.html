@@ -6,7 +6,7 @@
 <title>宣汉职业中专学校 · 志愿服务智慧管理平台</title>
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="apple-touch-icon" href="logo.png">
-<link rel="stylesheet" href="styles.css?v=18.27">
+<link rel="stylesheet" href="styles.css?v=18.28">
 </head>
 <body>
 
@@ -66,15 +66,19 @@
 
 <!-- ============================================ 找回密码 ============================================ -->
 <div id="forgotModal" class="mask" hidden>
-  <div class="modal">
+  <div class="modal" style="width:560px;max-width:94vw;">
     <div class="modal-title"><span class="bar"></span>找回密码<span class="bar"></span><button class="x" data-close="forgotModal">×</button></div>
-        <div class="modal-body"><p class="warn">凭「身份证号 + 姓名」或「身份证号 + 动态口令」重置登录密码（动态口令可在「我的档案」中查看）。</p><div class="form-grid">
-      <label>身份证号<i>*</i><input id="fId" maxlength="18"></label>
-      <label>姓名（或留空，改用动态口令）</label><input id="fName">
-      <label>动态口令（6 位，每 30 秒更新）</label><input id="fKey" maxlength="6">
-      <label>新登录密码<i>*</i><input id="fPwd1" type="password"></label>
-      <label>再次输入新密码<i>*</i><input id="fPwd2" type="password"></label>
-    </div></div>
+    <div class="modal-body">
+      <p class="warn">请先填写身份证号，然后任选<b>一种</b>方式验证后重置密码；动态口令请在「我的档案」中查看。</p>
+      <div class="form-grid">
+        <label class="full">身份证号<i>*</i><input id="fId" maxlength="18" placeholder="请输入身份证号"></label>
+        <div class="full" style="grid-column:1/-1;border-top:1px dashed #e0e0e0;margin:4px 0 2px;"></div>
+        <label style="background:var(--red-soft);padding:8px 10px;border-radius:4px;margin:-4px 0;"><b>方式一：姓名验证</b><span class="l">填写注册时的姓名（和身份证一一对应）</span><input id="fName" placeholder="如：张三"></label>
+        <label style="background:var(--red-soft);padding:8px 10px;border-radius:4px;margin:-4px 0;"><b>方式二：动态口令</b><span class="l">在「我的档案」查看 6 位动态口令，每 5 分钟更新</span><input id="fKey" maxlength="6" placeholder="如：123456"></label>
+        <label class="full">新登录密码<i>*</i><input id="fPwd1" type="password" placeholder="请设置新密码（不少于 6 位）"></label>
+        <label class="full">再次输入新密码<i>*</i><input id="fPwd2" type="password" placeholder="请再次输入新密码"></label>
+      </div>
+    </div>
     <div class="modal-foot"><button class="ghost" data-close="forgotModal">取消</button><button class="primary" id="btnForgotSubmit">提交重置</button></div>
   </div>
 </div>
@@ -205,9 +209,9 @@
 <script defer src="vendor/jspdf.umd.min.js"></script>
 <script defer src="vendor/jspdf.plugin.autotable.min.js"></script>
 <script defer src="vendor/qrcode-gen.js"></script>
-<script defer src="app.js?v=18.27"></script>
-<script defer src="app-biz.js?v=18.27"></script>
-<script defer src="zy-sync.js?v=18.27"></script>
-<script defer src="demo-data.js?v=18.27"></script>
+<script defer src="app.js?v=18.28"></script>
+<script defer src="app-biz.js?v=18.28"></script>
+<script defer src="zy-sync.js?v=18.28"></script>
+<script defer src="demo-data.js?v=18.28"></script>
 </body>
 </html>
