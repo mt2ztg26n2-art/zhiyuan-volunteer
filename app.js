@@ -136,6 +136,7 @@ function normalizeDB(db){
   if(!db.traces) db.traces=[];
   if(!db.evaluations) db.evaluations=[];
   if(!db.quotas) db.quotas=[];
+  if(!db.others) db.others=[];
   if(!db.nextIds) db.nextIds={};
   /* 演示数据不再自动注入（用户要求纯净系统，自己录入真实数据） */
   const seed=seedDB();
@@ -309,6 +310,8 @@ function canSee(route){
   if(route==='quota'&&(isAdmin()||manager||currentUser.role==='member'))return true;
   /* 痕迹日志：仅终端管理员（系统最高权限者）可见，超级管理员（校团委）看不到 */
   if(route==='traces')return canSeeTrace();
+  /* 操作手册 / 资料文件：所有角色可见（发布权限在界面内按角色控制） */
+  if(route==='help'||route==='other')return true;
   /* 终端管理员 = 系统维护者（不录入业务数据，只维护系统/账号/日志），
      故只显示：看板 / 我的档案 / 系统设置 / 痕迹日志 / 操作日志 / 评优评先 / 举报中心；
      业务模块（档案/服务/审核/活动/任务/新闻/通知/部门独立）由校团委/超级管理员操作 */
@@ -344,6 +347,8 @@ function buildSidebar(){
     settings:I('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
     logs:I('<path d="M3 6h13M3 12h13M3 18h13M19 6l3 3-3 3M19 12h2M19 18l3 3-3 3"/>'),
     traces:I('<path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="1.5"/>'),
+    help:I('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5"/>'),
+    other:I('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M13 12h4M13 15h4M9 12h.01M9 15h.01"/>'),
     eval:I('<circle cx="12" cy="8" r="6"/><path d="M9 14l-2 8 5-3 5 3-2-8"/><circle cx="12" cy="8" r="2"/>')
   };
   const all=[
@@ -359,6 +364,7 @@ function buildSidebar(){
     {k:'news',name:'新闻·通报',ico:IC.news},
     {k:'summary',name:'月度总结',ico:IC.summary},
     {k:'notify',name:'通知中心',ico:IC.notify},
+    {k:'other',name:'资料文件',ico:IC.other},
     {k:'yearKanban',name:'年度看板',ico:IC.dashboard},
     {k:'monthKanban',name:'月度看板',ico:IC.dashboard},
     {k:'broadcaster',name:'广播部管理',ico:IC.broadcaster},
@@ -370,15 +376,16 @@ function buildSidebar(){
     {k:'settings',name:'系统设置·换届',ico:IC.settings},
     {k:'traces',name:'痕迹日志',ico:IC.traces},
     {k:'logs',name:'操作日志',ico:IC.logs},
-    {k:'eval',name:'评优评先',ico:IC.eval}
+    {k:'eval',name:'评优评先',ico:IC.eval},
+    {k:'help',name:'操作手册',ico:IC.help}
   ].filter(it=>canSee(it.k));
   const groups=[
     {title:'总 览',items:all.filter(i=>['dashboard','data'].includes(i.k))},
     {title:'志愿管理',items:all.filter(i=>['files','service','reports','print','audit'].includes(i.k))},
-    {title:'业务中心',items:all.filter(i=>['activities','tasks','news','summary','yearKanban','monthKanban','notify'].includes(i.k))},
+    {title:'业务中心',items:all.filter(i=>['activities','tasks','news','summary','yearKanban','monthKanban','notify','other'].includes(i.k))},
     {title:'部门独立',items:all.filter(i=>['broadcaster','etiquette','subleague','quota'].includes(i.k))},
     {title:'个人',items:all.filter(i=>['my','report'].includes(i.k))},
-    {title:'系统',items:all.filter(i=>['settings','traces','logs','eval'].includes(i.k))}
+    {title:'系统',items:all.filter(i=>['settings','traces','logs','eval','help'].includes(i.k))}
   ].filter(g=>g.items.length);
 
   nav.innerHTML=groups.map(g=>`<div class="group-title">${esc(g.title)}</div>${g.items.map(it=>`<a data-route="${it.k}" class="${currentRoute()===it.k?'active':''}">${it.ico||''}<span>${esc(it.name)}</span></a>`).join('')}`).join('');
@@ -707,11 +714,11 @@ window.handleNotify=function(id,route){
 };
 window.goNotify=(id,route)=>handleNotify(id,route);
 
-const PAGE_TITLES={dashboard:'总控看板',files:'档案中心',service:'服务与加分',reports:'报表中心',print:'资料打印',audit:'审核中心',activities:'活动中心',tasks:'任务中心',news:'新闻·通报',summary:'月度总结',notify:'通知中心',data:'数据中心',broadcaster:'广播部管理',etiquette:'礼仪队管理',subleague:'团副总支',settings:'系统设置·换届',my:'我的档案',report:'举报中心',logs:'操作日志',traces:'痕迹日志',eval:'评优评先',yearKanban:'年度看板',monthKanban:'月度看板',quota:'团员名额'};
+const PAGE_TITLES={dashboard:'总控看板',files:'档案中心',service:'服务与加分',reports:'报表中心',print:'资料打印',audit:'审核中心',activities:'活动中心',tasks:'任务中心',news:'新闻·通报',summary:'月度总结',notify:'通知中心',data:'数据中心',broadcaster:'广播部管理',etiquette:'礼仪队管理',subleague:'团副总支',settings:'系统设置·换届',my:'我的档案',report:'举报中心',logs:'操作日志',traces:'痕迹日志',eval:'评优评先',yearKanban:'年度看板',monthKanban:'月度看板',quota:'团员名额',help:'操作手册',other:'资料文件'};
 function renderRoute(){
   if(!currentUser)return;
   highlightNav();
-  const map={'':renderDashboard,'dashboard':renderDashboard,'files':renderFiles,'service':renderService,'reports':renderReports,'print':renderPrint,'audit':renderAudit,'activities':renderActivities,'tasks':renderTasks,'news':renderNews,'summary':renderSummary,'notify':renderNotify,'data':renderData,'broadcaster':renderBroadcaster,'etiquette':renderEtiquette,'subleague':renderSubleague,'settings':renderSettings,'my':renderMy,'report':renderReport,'logs':renderLogs,'traces':renderTraces,'eval':renderEval,'yearKanban':renderYearKanban,'monthKanban':renderMonthKanban,'quota':renderQuota};
+  const map={'':renderDashboard,'dashboard':renderDashboard,'files':renderFiles,'service':renderService,'reports':renderReports,'print':renderPrint,'audit':renderAudit,'activities':renderActivities,'tasks':renderTasks,'news':renderNews,'summary':renderSummary,'notify':renderNotify,'data':renderData,'broadcaster':renderBroadcaster,'etiquette':renderEtiquette,'subleague':renderSubleague,'settings':renderSettings,'my':renderMy,'report':renderReport,'logs':renderLogs,'traces':renderTraces,'eval':renderEval,'yearKanban':renderYearKanban,'monthKanban':renderMonthKanban,'quota':renderQuota,'help':renderHelp,'other':renderOther};
   let cr=currentRoute();
   if(!canSee(cr)) cr='dashboard';
   const fn=map[cr]||renderDashboard;

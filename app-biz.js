@@ -739,8 +739,174 @@ function renderTraces(root){
   };
 }
 
-function renderLogs(root){
+/* ============================== 操作手册（各角色使用说明） ============================== */
+function renderHelp(root){
+  const me=currentUser;
+  const guides=[
+    {key:'terminal',name:'终端管理员（系统维护）',icon:'🔧',who:'终端管理员',lines:[
+      ['登录','使用身份证号 000000000000000002 / 密码 term123 登录'],
+      ['系统设置','左侧「系统设置」：评分规则、学校信息、年级/专业部/部门管理、管理员任命与换届'],
+      ['任命校团委','系统设置 → 管理员任命/换届 → 选择人员 → 任命为「超级管理员」；换届可整体移交权限'],
+      ['痕迹日志','左侧「痕迹日志」：查看谁在什么时间改了什么数据（前后值对比），只有您可见'],
+      ['操作日志','左侧「操作日志」：查看登录/注册/档案变更等全部关键操作'],
+      ['数据维护','系统设置 → 数据维护：两个按钮（恢复演示数据 / 清除所有演示数据，不退出系统）'],
+      ['云端同步','系统设置 → 云端同步：全设备自动同步，无需配置；异常时可手动「上传/下载」']
+    ]},
+    {key:'super',name:'校团委 · 超级管理员（数据负责人）',icon:'🏛',who:'超级管理员',lines:[
+      ['登录','身份证号 000000000000000001 / 密码 admin123（密码可在系统设置或「我的档案」中修改）'],
+      ['录入档案','左侧「档案中心」→ 选部门 tab（青年志愿者协会/广播站/礼仪队/团副总支/团总支/学生会）→ 「录入XX档案」→ 按模板填写 → 提交'],
+      ['模板差异','不同部门录入模板不同：志愿者看"志愿服务经历"、广播站看"语言功底+普通话清晰度"、礼仪队看"礼仪服务经历"、负责人看"分管工作与职责"'],
+      ['发布活动','「活动中心」→ 新增活动（标题/时间/地点/人数/封面）→ 发布后志愿者可报名'],
+      ['加分服务','「服务与加分」→ 录入服务记录（活动/班级/姓名/时长）→ 自动计入报表与排行'],
+      ['审核注册','「审核中心」→ 手机端提交的注册自动出现 → 审核通过/驳回（结果自动通知本人）'],
+      ['发布新闻','「新闻·通报」→ 发布新闻/通报（可置顶）'],
+      ['月度总结','「月度总结」→ 按月份写总结 + 上传活动图片 → 导出 PDF'],
+      ['查看报表','「报表中心」→ 按日期范围导出 Excel/PDF（相同活动自动合并）'],
+      ['团员名额','「团员名额」→ 审批推荐/自荐申请'],
+      ['资料文件','「资料文件」→ 可发布文字、上传文件（表格/通知等）、贴外部链接，供全员查看']
+    ]},
+    {key:'president',name:'会长 / 副会长',icon:'🎖',who:'会长/副会长',lines:[
+      ['查看数据','「数据中心」「报表中心」「年度/月度看板」：查看全校志愿服务数据与排行'],
+      ['管理活动','「活动中心」→ 发布活动、管理报名'],
+      ['审核','「审核中心」→ 审核注册与名额申请'],
+      ['任务','「任务中心」→ 发布任务（值日/招募），查看报名'],
+      ['权限范围','可查看全部档案与数据（除痕迹日志）']
+    ]},
+    {key:'minister',name:'部长 / 站长 / 管理员',icon:'📌',who:'部长/站长/管理员',lines:[
+      ['本部门档案','「档案中心」→ 只显示本部门档案（防信息泄露），可录入/编辑/导出'],
+      ['部门活动','「活动中心」→ 发布本部门活动'],
+      ['部门服务','「服务与加分」→ 录入本部门服务记录'],
+      ['权限范围','只能查看自己部门的数据，其他部门不可见']
+    ]},
+    {key:'broadcaster',name:'广播站',icon:'📻',who:'广播站',lines:[
+      ['广播记录','「广播部管理」→ 录入每次广播记录（日期/主题/时长）'],
+      ['档案','「档案中心」→ 查看本部门（广播站）成员档案，模板含语言功底/普通话清晰度'],
+      ['权限范围','只能看广播站数据']
+    ]},
+    {key:'etiquette',name:'礼仪队',icon:'🌸',who:'礼仪队',lines:[
+      ['礼仪安排','「礼仪队管理」→ 录入礼仪活动安排（日期/活动/负责人/人数）'],
+      ['档案','「档案中心」→ 查看本部门（礼仪队）成员档案，模板含礼仪服务经历'],
+      ['权限范围','只能看礼仪队数据']
+    ]},
+    {key:'subleague',name:'团副总支',icon:'',who:'团副总支',lines:[
+      ['组织生活','「团副总支」→ 录入团支部组织生活/活动记录'],
+      ['档案','「档案中心」→ 查看本部门（团副总支）成员档案'],
+      ['权限范围','只能看团副总支数据']
+    ]},
+    {key:'member',name:'志愿者（学生）',icon:'🙋',who:'志愿者',lines:[
+      ['注册','登录页点「志愿者注册」→ 填写信息提交 → 等待管理员审核'],
+      ['登录','审核通过后，用身份证号 + 自己设置的密码登录'],
+      ['报名活动','「活动中心」→ 查看招募中的活动 → 报名'],
+      ['报名任务','「任务中心」→ 报名任务（值日/招募）'],
+      ['我的档案','「我的档案」→ 查看个人档案、累计服务时长、审核状态'],
+      ['通知','「通知中心」→ 查看系统通知（审核结果、活动通知）'],
+      ['申请名额','「团员名额」→ 提交入团名额自荐申请'],
+      ['注意事项','所有数据自动云端同步，换设备登录同一账号即可看到一致数据']
+    ]}
+  ];
+  const tabBar=guides.map(g=>`<a class="file-tab ${g.key===me.role?'active':''}" data-guide="${g.key}" style="cursor:pointer;padding:7px 14px;display:inline-block;background:${g.key===me.role?'var(--red)':'#f0f2f5'};color:${g.key===me.role?'#fff':'var(--ink-2)'};font-size:13px;margin:0 4px 8px 0;border-radius:2px;">${g.icon}${g.name}</a>`).join('');
+  const cur=guides.find(g=>g.key===me.role)||guides[1];
   root.innerHTML=`
+    <div class="notice-strip"><span class="label">操作手册</span><span class="ct">按角色查看系统使用说明 · 管理员可在「资料文件」发布补充文档</span></div>
+    <div class="page-block">${blockHead('使用说明 · 按角色','')}<div class="block-body">
+      <div style="margin-bottom:6px;">${tabBar}</div>
+      <div id="helpBody"></div>
+    </div></div>`;
+  const renderGuide=(key)=>{
+    const g=guides.find(x=>x.key===key)||guides[0];
+    $('#helpBody').innerHTML=`<div style="background:#fafbfc;border:1px solid #f0f2f5;padding:18px 22px;">
+      <div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:4px;">${g.icon}${g.name}</div>
+      <div style="font-size:12px;color:var(--ink-3);margin-bottom:12px;">以下为「${g.who}」的完整操作说明：</div>
+      ${g.lines.map(([t,c])=>`<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px dashed #e8eaee;font-size:14px;"><div style="flex:0 0 110px;color:var(--red);font-weight:600;">${esc(t)}</div><div style="flex:1;color:var(--ink-2);line-height:1.7;">${esc(c)}</div></div>`).join('')}
+      <div class="tip-line mt-12" style="color:var(--ink-3);">提示：管理员可在「资料文件」模块发布图文/文件/链接形式的补充说明，供全体成员查阅。</div>
+    </div>`;
+  };
+  renderGuide(me.role);
+  $$('.file-tab[data-guide]').forEach(a=>a.onclick=()=>{
+    $$('.file-tab[data-guide]').forEach(x=>{x.style.background=x.dataset.guide===a.dataset.guide?'var(--red)':'#f0f2f5';x.style.color=x.dataset.guide===a.dataset.guide?'#fff':'var(--ink-2)';});
+    renderGuide(a.dataset.guide);
+  });
+}
+
+/* ============================== 资料文件（上传文件 + 文字 + 链接） ============================== */
+function renderOther(root){
+  const list=(DB.others||[]).slice().sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));
+  const canPub=currentUser&&(ROLE_RANK[currentUser.role]||0)>=60; /* 管理级可发布 */
+  root.innerHTML=`
+    <div class="notice-strip"><span class="label">资料文件</span><span class="ct">发布文字 / 上传文件 / 外链，供全员查阅；管理员可发布与删除</span></div>
+    ${canPub?`<div class="page-block">${blockHead('发布资料','')}<div class="block-body"><button class="primary" style="height:38px;padding:0 22px;" onclick="openOtherForm()">+ 发布文字 / 文件 / 链接</button><span class="f12 c-3" style="margin-left:10px;">可上传：通知文件、表格模板、活动资料、操作手册补充文档等</span></div></div>`:''}
+    <div class="page-block">${blockHead('资料列表（'+list.length+'）','<button class="ghost" onclick="exportOthers()">导出清单</button>')}<div class="block-body">
+      ${list.length?`<div class="tbl-shell scroll-x"><table class="tbl"><thead><tr><th style="width:40px">#</th><th>标题</th><th style="width:70px">类型</th><th style="width:100px">发布人</th><th style="width:120px">时间</th><th style="width:160px">操作</th></tr></thead><tbody>
+      ${list.map((o,i)=>`<tr><td class="ctr">${i+1}</td><td><b>${esc(o.title)}</b>${o.content?`<div class="f12 c-3" style="margin-top:3px;">${esc((o.content||'').slice(0,60))}${(o.content||'').length>60?'…':''}</div>`:''}</td>
+      <td>${o.files&&o.files.length?`<span class="tag ok">文件 ${o.files.length}</span>`:''}${o.links&&o.links.length?`<span class="tag" style="background:#e6f7ff;color:#1890ff;">链接 ${o.links.length}</span>`:''}${o.content?'<span class="tag" style="background:#f0f0f0;color:#5a5a5a;">文字</span>':''}</td>
+      <td>${esc(o.publisher||'-')}</td><td>${esc((o.time||'').slice(0,16))}</td>
+      <td class="ops-cell"><div class="ops-col"><button onclick="viewOther('${o.id}')">查看</button>${canPub||o.publisher===currentUser.name?`<button class="warn" onclick="delOther('${o.id}')">删除</button>`:''}</div></td></tr>`).join('')}
+      </tbody></table></div>`:'<div class="empty-tip">暂无资料，管理员可点击上方「发布资料」添加文件/文字/链接</div>'}
+    </div></div>`;
+  window.exportOthers=function(){
+    if(!window.XLSX)return toast('导出模块未加载','err');
+    const ws=XLSX.utils.json_to_sheet((DB.others||[]).map(o=>({标题:o.title,发布人:o.publisher,时间:o.time,文字:(o.content||'').slice(0,200),文件数:(o.files||[]).length,链接数:(o.links||[]).length})));
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'资料文件');XLSX.writeFile(wb,'资料文件清单.xlsx');
+  };
+}
+window.openOtherForm=function(){
+  openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>发布资料（文字 / 文件 / 链接）<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
+    <div class="form-grid cols-1">
+      <label>标题<i>*</i><input id="otTitle" placeholder="如：志愿者管理办法 / 活动资料模板"></label>
+      <label>文字内容（选填）<textarea id="otContent" style="min-height:110px;" placeholder="支持图文说明、通知正文、使用说明……"></textarea></label>
+      <label>上传文件（可多选：PDF/Word/Excel/图片等）<input id="otFiles" type="file" multiple></label>
+      <div id="otFileList" class="f12 c-3"></div>
+      <label>外部链接（格式：标题|网址，一行一条，如：高德地图|https://uri.amap.com）<textarea id="otLinks" style="min-height:54px;" placeholder="名称|https://网址"></textarea></label>
+    </div>
+  </div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="otSave">发布</button></div></div>`);
+  const fileInfo=$('#otFileList');
+  $('#otFiles').onchange=()=>{
+    const fs=$('#otFiles').files;
+    fileInfo.innerHTML=Array.from(fs).map(f=>`📄 ${esc(f.name)} (${(f.size/1024).toFixed(0)}KB)`).join('<br>');
+  };
+  $('#otSave').onclick=()=>{
+    const title=$('#otTitle').value.trim();
+    if(!title)return toast('请填写标题','err');
+    const files=Array.from($('#otFiles').files||[]);
+    const links=($('#otLinks').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(s=>{
+      const m=s.split('|');return {text:(m[0]||'').trim(),url:(m[1]||m[0]||'').trim()};
+    }).filter(l=>l.url);
+    if(!files.length && !links.length && !$('#otContent').value.trim())return toast('请至少填写文字、上传文件或添加链接之一','err');
+    let pending=files.length,fileItems=[];
+    const finish=()=>{
+      DB.others=DB.others||[];
+      DB.others.unshift({id:uid('ot'),title,content:$('#otContent').value.trim(),files:fileItems,links,publisher:currentUser.name,role:currentUser.role,time:now()});
+      saveDB();pushLog('发布资料',`发布「${title}」`);pushTrace('发布资料','资料: '+title);
+      closeModal();if(currentRoute()==='other')renderOther($('#viewRoot'));toast('发布成功','ok');
+    };
+    if(!files.length){finish();return}
+    files.forEach(f=>{
+      const r=new FileReader();
+      r.onload=()=>{fileItems.push({name:f.name,size:f.size,type:f.type,dataUrl:r.result});if(--pending===0)finish();};
+      r.onerror=()=>{if(--pending===0)finish();};
+      r.readAsDataURL(f);
+    });
+  };
+};
+window.viewOther=function(id){
+  const o=(DB.others||[]).find(x=>x.id===id);if(!o)return;
+  openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>${esc(o.title)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
+    <div class="f12 c-3" style="margin-bottom:10px;">发布人：${esc(o.publisher)} · ${esc(fmtDateTime(o.time))}</div>
+    ${o.content?`<div style="white-space:pre-wrap;line-height:1.8;font-size:14px;color:var(--ink);background:#fafbfc;border:1px solid #f0f2f5;padding:14px 16px;margin-bottom:14px;">${esc(o.content)}</div>`:''}
+    ${(o.files||[]).length?`<div class="block-title">附件文件</div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">${o.files.map(f=>`<a href="${f.dataUrl}" download="${esc(f.name)}" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f7f8fa;border:1px solid #f0f2f5;text-decoration:none;color:var(--red);font-size:14px;">📄 ${esc(f.name)} <span class="f12 c-3">(${(f.size/1024).toFixed(0)}KB) 下载</span></a>`).join('')}</div>`:''}
+    ${(o.links||[]).length?`<div class="block-title">相关链接</div><div style="display:flex;flex-direction:column;gap:8px;">${o.links.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#e6f7ff;border:1px solid #bae7ff;text-decoration:none;color:#1890ff;font-size:14px;">🔗 ${esc(l.text||l.url)} <span class="f12 c-3">${esc(l.url)} ↗</span></a>`).join('')}</div>`:''}
+    ${(!o.content&&!(o.files||[]).length&&!(o.links||[]).length)?'<div class="empty-tip">该资料暂无内容</div>':''}
+  </div><div class="modal-foot"><button class="ghost" data-close-modal>关闭</button></div></div>`);
+};
+window.delOther=function(id){
+  const o=(DB.others||[]).find(x=>x.id===id);if(!o)return;
+  confirmDialog(`确认删除资料「<b>${esc(o.title)}</b>」？`,()=>{
+    DB.others=DB.others.filter(x=>x.id!==id);saveDB();pushLog('删除资料',`删除「${o.title}」`);pushTrace('删除资料','资料: '+o.title);
+    if(currentRoute()==='other')renderOther($('#viewRoot'));toast('已删除','ok');
+  },'删除资料');
+};
+
+function renderLogs(root){  root.innerHTML=`
     <div class="search-bar">
       <div class="field"><div class="l">关键字（操作人 / 内容）</div><input id="logKw" placeholder="搜索日志"></div>
       <div class="field"><div class="l">操作类型</div><select id="logAct"><option value="">全部</option><option>登录</option><option>注册</option><option>重置密码</option><option>录入档案</option><option>修改档案</option><option>签到</option><option>举报</option><option>受理举报</option></select></div>
