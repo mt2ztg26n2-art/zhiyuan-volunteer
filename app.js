@@ -465,26 +465,48 @@ function doLogin(){
   if(!id||!pwd)return toast('请填写身份证号和登录密码','err');
   if(!cap)return toast('请输入验证码','err');
   if(!checkCaptcha(cap)){toast('验证码错误，请重新输入','err');drawCaptcha();$('#loginCaptcha').value='';return}
-  const u=DB.users.find(x=>x.idCard===id&&x.pwd===pwd);
-  if(!u)return toast('身份证号或密码不正确','err');
-  if(u.activated===false){
-    /* 云端注册通道：查询审核结果，通过则自动激活登录；未通过/未知则提示 */
-    if(u.pending && window.ZYStatus){
-      ZYStatus.check(id).then(res=>{
-        if(res.ok && res.status==='approved'){
-          u.activated=true; u.pending=false; u.status=u.status||'正常在岗';
-          saveDB(); pushLog('注册',`${u.name} 注册已审核通过，账号自动激活`);
-          toast('审核已通过！欢迎加入','ok');
-          doEnter(u);
-        }else if(res.ok && res.status==='rejected'){
-          toast('注册申请未通过审核，请联系团委管理员','err');
-        }else{
-          toast('账号未激活：注册申请正在审核中，请稍后再试','err');
+  let u=DB.users.find(x=>x.idCard===id&&x.pwd===pwd);
+  if(!u){
+    /* 本机无该用户：可能云端有（新设备首次登录 / 他端注册后本机未同步），先拉云端核对 */
+    if(window.ZY && ZY.pull){
+      return ZY.pull(true).then(p=>{
+        if(p.ok && p.data && Array.isArray(p.data.users)){
+          const cu=p.data.users.find(x=>x.idCard===id&&x.pwd===pwd);
+          if(cu){
+            const ex=DB.users.find(x=>x.idCard===id);
+            if(!ex) DB.users.push(cu); else Object.assign(ex,cu);
+            saveDB();
+            if(cu.activated===true){ doEnter(cu); return; }
+            if(cu.activated===false && cu.pending){ toast('账号未激活：注册申请正在审核中，请稍后再试','err'); return; }
+            toast('账号未激活，请联系管理员','err'); return;
+          }
         }
-      });
-      return;
+        toast('身份证号或密码不正确','err');
+      }).catch(()=>{ toast('身份证号或密码不正确','err'); });
     }
-    return toast('账号未激活，请联系管理员','err');
+    return toast('身份证号或密码不正确','err');
+  }
+  if(u.activated===false){
+    /* v18.24 起审核结果通过 ZY.push 整库上云（不再写 zy_status 表）。
+       登录时强制拉取云端主库最新状态，核对 activated，审核通过则直接激活登录。 */
+    if(window.ZY && ZY.pull){
+      return ZY.pull(true).then(p=>{
+        if(p.ok && p.data && Array.isArray(p.data.users)){
+          const cu=p.data.users.find(x=>x.idCard===id);
+          if(cu && cu.activated===true){
+            u.activated=true; u.pending=false; u.status=u.status||'正常在岗'; saveDB();
+            pushLog('注册',`${u.name} 注册已审核通过，账号自动激活`);
+            toast('审核已通过！欢迎加入','ok'); doEnter(u); return;
+          }
+        }
+        if(u.pending) toast('账号未激活：注册申请正在审核中，请稍后再试','err');
+        else toast('账号未激活，请联系管理员','err');
+      }).catch(()=>{
+        if(u.pending) toast('账号未激活：注册申请正在审核中，请稍后再试','err');
+        else toast('账号未激活，请联系管理员','err');
+      });
+    }
+    return toast(u.pending?'账号未激活：注册申请正在审核中，请稍后再试':'账号未激活，请联系管理员','err');
   }
   doEnter(u);
 }
