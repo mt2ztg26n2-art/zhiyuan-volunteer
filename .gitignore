@@ -1,0 +1,7 @@
+# 本地临时/备份文件
+_*.json
+_*.js
+_*.sh
+*.tmp
+*.log
+.DS_Store
