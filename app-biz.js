@@ -465,12 +465,45 @@ window.viewActSignups=(id)=>{
 window.exportActSignups=(id)=>{const a=DB.activities.find(x=>x.id===id);const ws=XLSX.utils.json_to_sheet((a.signups||[]).map((s,i)=>({'序号':i+1,'姓名':s.name,'专业部':s.dept,'班级':s.cls,'时间':s.time})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'报名名单');XLSX.writeFile(wb,`${a.title}_报名名单.xlsx`);toast('已导出','ok')};
 window.exportActivities=function(){const rows=DB.activities.map(a=>({'活动':a.title,'开始':a.startDT,'结束':a.endDT,'地点':a.location,'主办':a.organizer,'招募':a.need,'已报名':(a.signups||[]).length,'状态':a.status}));const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'活动');XLSX.writeFile(wb,`活动列表_${today()}.xlsx`);toast('已导出','ok')};
 
+/* ============================== 分享二维码（v19.17：扫码直接打开网页报名，可分享） ============================== */
+/* 生成可分享深链：扫码 → 打开平台对应活动/任务页（版本守卫保留 hash） */
+function zyShareUrl(kind,id){ return location.origin + location.pathname + '?v=19.17#' + kind + '/' + id; }
+window.copyShareLink=function(url){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>toast('链接已复制，快去分享吧','ok')).catch(()=>toast('复制失败，请长按链接手动复制','err'));
+  } else toast('复制失败，请长按链接手动复制','err');
+};
+/* 渲染二维码到指定容器 */
+function renderQR(containerId, url){
+  try{
+    const q=qrcode(0,'M'); q.addData(url); q.make();
+    const c=document.getElementById(containerId); if(c) c.innerHTML=q.createImgTag(6,10);
+  }catch(e){ toast('二维码生成失败：'+(e.message||e),'err'); }
+}
 window.showActQR=function(id){
   const a=DB.activities.find(x=>x.id===id);if(!a)return;
-  $('#qrDrawer').hidden=false;
-  const info=`活动报名|${a.title}|${a.startDT}|${a.location}`;
-  $('#qrBody').innerHTML=`<div class="qr-box"><div class="qr-hint">扫描二维码，向管理员登记报名以下活动</div><div class="qr-target">${esc(a.title)}</div><div class="qr-canvas" id="qrCanvas"></div><div class="qr-meta">地点：${esc(a.location)} · 开始：${esc(a.startDT)}<br>（单机版：扫码内容为报名登记信息）</div></div>`;
-  const q=qrcode(0,'M');q.addData(info);q.make();$('#qrCanvas').innerHTML=q.createImgTag(6,10);
+  openActShare(id);
+};
+window.openActShare=async function(id){
+  /* 扫码人设备可能还没同步到该活动：先安全合并云端（不覆盖本地独有数据） */
+  if(!DB.activities.find(x=>x.id===id) && window.ZY && ZY.pullMerge){
+    try{ await ZY.pullMerge(); }catch(e){}
+  }
+  const a=DB.activities.find(x=>x.id===id);
+  if(!a){ toast('活动不存在或已被删除','err'); return; }
+  const url=zyShareUrl('act', id);
+  const meSigned=(a.signups||[]).some(s=>s.idCard===currentUser.idCard);
+  const nd=now();
+  const inSg=a.signin&&a.signin.start&&a.signin.end&&nd>=a.signin.start&&nd<=a.signin.end;
+  openModal(`<div class="modal" style="width:460px;"><div class="modal-title"><span class="bar"></span>活动分享 · 扫码报名<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
+    <div class="qr-hint">用手机相机 / 微信扫一扫，直接打开本活动页面报名</div>
+    <div class="qr-target">${esc(a.title)}</div>
+    <div class="qr-meta">${esc(a.startDT)} ~ ${esc(a.endDT||'')}<br>地点：${esc(a.location)}</div>
+    <div class="qr-canvas" id="qrCanvas"></div>
+    <div class="share-link" id="shareLink" title="点击复制">${esc(url)}</div>
+    <div class="f12 c-3 mt-8">提示：把链接或二维码分享给同学，对方扫码即可打开并报名。</div>
+    </div><div class="modal-foot"><button class="ghost" data-close-modal>关 闭</button><button class="primary" onclick="copyShareLink('${esc(url)}')">复制链接</button>${inSg?`<button class="ok" onclick="actCheckin('${id}')">活动签到</button>`:''}<button class="ok" onclick="actSignup('${id}')">${meSigned?'已报名（再点查看）':'我 报 名'}</button></div></div>`);
+  renderQR('qrCanvas', url);
 };
 
 /* ============================== 任务中心 ============================== */
@@ -547,10 +580,27 @@ window.viewTaskSignups=(id)=>{const t=DB.tasks.find(x=>x.id===id);if(!t)return;c
 window.exportTasks=function(){const rows=DB.tasks.map(t=>({'任务':t.title,'类型':t.type,'发布人':t.publisher,'开始':t.startDT,'结束':t.endDT,'已读':(t.reads||[]).length,'已报名':(t.signups||[]).length}));const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'任务');XLSX.writeFile(wb,`任务列表_${today()}.xlsx`);toast('已导出','ok')};
 window.showTaskQR=function(id){
   const t=DB.tasks.find(x=>x.id===id);if(!t)return;
-  $('#qrDrawer').hidden=false;
-  const info=`任务登记|${t.title}|${t.publisher}`;
-  $('#qrBody').innerHTML=`<div class="qr-box"><div class="qr-hint">扫描二维码，向管理员登记报名该任务</div><div class="qr-target">${esc(t.title)}</div><div class="qr-canvas" id="qrCanvas"></div><div class="qr-meta">发布：${esc(t.publisher)}</div></div>`;
-  const q=qrcode(0,'M');q.addData(info);q.make();$('#qrCanvas').innerHTML=q.createImgTag(6,10);
+  openTaskShare(id);
+};
+window.openTaskShare=async function(id){
+  if(!DB.tasks.find(x=>x.id===id) && window.ZY && ZY.pullMerge){
+    try{ await ZY.pullMerge(); }catch(e){}
+  }
+  const t=DB.tasks.find(x=>x.id===id);
+  if(!t){ toast('任务不存在或已被删除','err'); return; }
+  const url=zyShareUrl('task', id);
+  const meSigned=(t.signups||[]).some(s=>s.idCard===currentUser.idCard);
+  const nd=now();
+  const inSg=t.signin&&t.signin.start&&t.signin.end&&nd>=t.signin.start&&nd<=t.signin.end;
+  openModal(`<div class="modal" style="width:460px;"><div class="modal-title"><span class="bar"></span>任务分享 · 扫码报名<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
+    <div class="qr-hint">用手机相机 / 微信扫一扫，直接打开本任务页面报名</div>
+    <div class="qr-target">${esc(t.title)}</div>
+    <div class="qr-meta">${esc(t.startDT)} ~ ${esc(t.endDT)}<br>发布：${esc(t.publisher)}${t.signin&&t.signin.start?` · 签到：${esc(t.signin.start.slice(5,16))}~${esc(t.signin.end.slice(5,16))}`:''}</div>
+    <div class="qr-canvas" id="qrCanvas"></div>
+    <div class="share-link" id="shareLink" title="点击复制">${esc(url)}</div>
+    <div class="f12 c-3 mt-8">提示：把链接或二维码分享给同学，对方扫码即可打开并报名。</div>
+    </div><div class="modal-foot"><button class="ghost" data-close-modal>关 闭</button><button class="primary" onclick="copyShareLink('${esc(url)}')">复制链接</button>${inSg?`<button class="ok" onclick="taskCheckin('${id}')">任务签到</button>`:''}<button class="ok" onclick="taskSignup('${id}')">${meSigned?'已报名（再点查看）':'我 报 名'}</button></div></div>`);
+  renderQR('qrCanvas', url);
 };
 
 /* ============================== 新闻 ============================== */
