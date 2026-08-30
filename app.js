@@ -504,7 +504,11 @@ function bindLogin(){
   $$('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).hidden=true);
   $$('[data-close-drawer]').forEach(b=>b.onclick=()=>$('#'+b.dataset.closeDrawer).hidden=true);
   window.addEventListener('hashchange',renderRoute);
+  /* 刷新/关闭页面前强制把本地数据推到云端（防止刷新时云端旧数据覆盖本地） */
+  window.addEventListener('pagehide',()=>{ try{ if(window.ZY&&window.DB) ZY.markDirty(); }catch(e){} });
 }
+function flushCloudNow(){ try{ if(window.ZY&&window.DB) ZY.markDirty(); }catch(e){} }
+window.flushCloudNow=flushCloudNow;
 
 function showWelcome(name){
   const ico='<svg viewBox="0 0 24 24" width="46" height="46"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z" fill="#c8161d"/><path d="M8 11l3 3 5-5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';

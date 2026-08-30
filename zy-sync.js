@@ -92,7 +92,7 @@ window.ZY = (function(){
   function markDirty(){ dirty = true; scheduleFlush(); }
   function scheduleFlush(){
     if(flushTimer) return;
-    flushTimer = setTimeout(async()=>{ flushTimer=null; if(dirty){ dirty=false; await push(); } }, 2500);
+    flushTimer = setTimeout(async()=>{ flushTimer=null; if(dirty){ dirty=false; await push(); } }, 400);
   }
 
   /* ---------- 轮询（多设备实时同步） ---------- */
@@ -113,15 +113,18 @@ window.ZY = (function(){
             await push();
           }
           else if(p.ok && p.data && !p.empty){
+            /* 合并（只增不删）而非覆盖：本地独有数据保留，云端独有数据并入 */
+            const merged = mergeDB(window.DB||{}, p.data);
             try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
             const backup = window.DB;
-            window.DB = p.data;
+            window.DB = merged;
             if(window.normalizeDB) window.normalizeDB();
             if(window.saveDB) window.saveDB();
             if(window.renderRoute) window.renderRoute();
             if(window.updateNotifyBadge) window.updateNotifyBadge();
             if(window.toast) window.toast('已同步云端最新数据','ok');
-            if(window._cloudMergeCb) window._cloudMergeCb(p.data, backup);
+            if(window._cloudMergeCb) window._cloudMergeCb(merged, backup);
+            await push(); /* 合并结果回传云端 */
           }
         }
         /* 同步云端注册队列（手机注册 → 电脑审核中心） */
@@ -139,8 +142,44 @@ window.ZY = (function(){
     return !d || (!(d.users||[]).length && !(d.services||[]).length && !(d.activities||[]).length);
   }
 
-  /* ---------- 首次接入：云端空/空库 且 本地有数据 → 以本地为准上传；
-     云端有实质数据 → 拉取覆盖（备份）；本地空且云端空 → 保持空（防空设备覆盖竞态） ---------- */
+  /* ---------- 合并（只增不删，本地优先；任何设备的数据都不丢失） ---------- */
+  function mergeArrays(localArr, cloudArr, keyFn){
+    const map={};
+    (cloudArr||[]).forEach(x=>{ if(x&&keyFn(x)) map[keyFn(x)]=x; });
+    (localArr||[]).forEach(x=>{ if(x&&keyFn(x)) map[keyFn(x)]=x; });
+    return Object.values(map);
+  }
+  function mergeDB(local, cloud){
+    const out=JSON.parse(JSON.stringify(cloud||{}));
+    out.users=mergeArrays(local.users, cloud.users, u=>u.idCard);
+    out.services=mergeArrays(local.services, cloud.services, s=>s.id);
+    out.activities=mergeArrays(local.activities, cloud.activities, a=>a.id);
+    out.tasks=mergeArrays(local.tasks, cloud.tasks, t=>t.id);
+    out.news=mergeArrays(local.news, cloud.news, n=>n.id);
+    out.notifies=mergeArrays(local.notifies, cloud.notifies, n=>n.id);
+    out.others=mergeArrays(local.others, cloud.others, o=>o.id);
+    out.broadcastRecs=mergeArrays(local.broadcastRecs, cloud.broadcastRecs, x=>x.id);
+    out.etiquetteRecs=mergeArrays(local.etiquetteRecs, cloud.etiquetteRecs, x=>x.id);
+    out.subleagueRecs=mergeArrays(local.subleagueRecs, cloud.subleagueRecs, x=>x.id);
+    out.quotas=mergeArrays(local.quotas, cloud.quotas, q=>q.id);
+    out.evaluations=mergeArrays(local.evaluations, cloud.evaluations, e=>e.id);
+    out.reports=mergeArrays(local.reports, cloud.reports, r=>r.id);
+    out.summaries=mergeArrays(local.summaries, cloud.summaries, s=>s.id);
+    out.traces=mergeArrays(local.traces, cloud.traces, t=>t.id);
+    out.logs=mergeArrays(local.logs, cloud.logs, l=>l.id);
+    if(cloud.dictionaries&&local.dictionaries){
+      out.dictionaries=JSON.parse(JSON.stringify(cloud.dictionaries));
+      Object.keys(local.dictionaries||{}).forEach(k=>{
+        const a=out.dictionaries[k], b=local.dictionaries[k];
+        if(Array.isArray(a)&&Array.isArray(b)) out.dictionaries[k]=Array.from(new Set([...a,...b]));
+        else if(b!=null&&a==null) out.dictionaries[k]=b;
+      });
+    }
+    out.nextIds=Object.assign({}, cloud.nextIds||{}, local.nextIds||{});
+    return out;
+  }
+
+  /* ---------- 首次接入：本地与云端合并（谁的数据都不丢），再回传云端 ---------- */
   async function bootstrap(){
     const p = await pull();
     if(p.ok && (p.empty || !p.data || isCloudEmpty(p.data))){
@@ -148,16 +187,18 @@ window.ZY = (function(){
         const pu = await push();
         return pu;
       }
-      return {ok:true, empty:true}; /* 本地也空：不推不拉，保持云端空，等待首个有数据的设备初始化 */
+      return {ok:true, empty:true};
     }
     if(p.ok && p.data){
+      const merged = mergeDB(window.DB||{}, p.data);
       try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
-      window.DB = p.data;
+      window.DB = merged;
       if(window.normalizeDB) window.normalizeDB();
       if(window.saveDB) window.saveDB();
       if(window.renderRoute) window.renderRoute();
+      await push(); /* 合并结果回传云端，保证本地独有数据也上去 */
       lastSync = Date.now(); localStorage.setItem(LS_LAST, String(lastSync));
-      return {ok:true, pulled:true};
+      return {ok:true, pulled:true, merged:true};
     }
     return p;
   }
