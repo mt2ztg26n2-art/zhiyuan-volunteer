@@ -244,8 +244,27 @@ window.ZY = (function(){
    * 尚未上云的独有用户）；③ 冲突一律云端胜；④ 墓碑过滤已删除用户。 */
   function mergeUsers(localArr, cloudArr, tombs){
     const map={};
-    (cloudArr||[]).forEach(x=>{ if(x && x.idCard) map[x.idCard]=x; });
-    (localArr||[]).forEach(x=>{ if(x && x.idCard && !map[x.idCard]) map[x.idCard]=x; });
+    /* 【v19.10 关键修复】用户冲突合并改为"状态感知"：
+     * 旧版"云权威"（cloud 永远覆盖 local）导致审核按钮"点了还有"——
+     *   管理员本地刚点审核通过(activated=true) → push 拉云端旧 pending 版本
+     *   → 云端 pending 覆盖本地 activated → 上传后云端还是 pending
+     *   → 15 秒轮询拉回 pending → 审核永远过不了。
+     * 新规则：
+     *   1) 任一方 activated===true（已审核通过=终态）→ 该版本无条件胜
+     *      （同时兼容 v19.0 场景：云端已通过 vs 手机本地残留 pending → 云端胜）
+     *   2) 否则取 updatedAt 较新的（审核/驳回动作会写 updatedAt）
+     *   3) 都没有时间戳 → 取本地（保留本地最新操作） */
+    const pick=(a,b)=>{
+      if(!a) return b;
+      if(!b) return a;
+      const aAct=a.activated===true, bAct=b.activated===true;
+      if(aAct!==bAct) return aAct?a:b;
+      const at=Number(a.updatedAt||0), bt=Number(b.updatedAt||0);
+      if(at||bt) return bt>at?b:a;
+      return b;
+    };
+    (cloudArr||[]).forEach(x=>{ if(x && x.idCard) map[x.idCard]=pick(map[x.idCard],x); });
+    (localArr||[]).forEach(x=>{ if(x && x.idCard) map[x.idCard]=pick(map[x.idCard],x); });
     if(tombs){ Object.keys(map).forEach(k=>{ if(tombs['users:'+k]) delete map[k]; }); }
     return Object.values(map);
   }
