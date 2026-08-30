@@ -135,11 +135,38 @@ function loadDB(){
   try{ const s=localStorage.getItem(LS_KEY); if(s){ DB=normalizeDB(JSON.parse(s)); return DB; } }  catch(e){}
   DB = normalizeDB(seedDB()); saveDB(); return DB;
 }
-function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } }
+function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && ZY.token && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
 function resetDB(){
   if(!confirm('确定清除所有数据并恢复初始演示数据吗？该操作不可恢复，请先导出 Excel 备份！')) return;
   localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_USR); location.reload();
 }
+/* 云端同步：登录后由管理角色调用，连接 Supabase 并启动多设备轮询 */
+window.initCloudSync=async function(silent){
+  try{
+    const cfg=ZY.loadCfg();
+    if(!cfg||!ZY.isCfg()){
+      if(!silent&&window.toast) toast('未配置云端同步：请到「系统设置 → 云端同步」填写配置','err');
+      return {ok:false, msg:'未配置'};
+    }
+    const lg=await ZY.login();
+    if(!lg.ok){
+      if(!silent&&window.toast) toast('云端登录失败：'+lg.msg,'err');
+      return lg;
+    }
+    const bt=await ZY.bootstrap();
+    if(bt.ok){
+      ZY.startPoll();
+      if(!silent&&window.toast) toast(bt.pulled?'已连接云端并载入云端数据（多设备实时同步开启）':'已连接云端，本地数据已上传（多设备实时同步开启）','ok');
+      return {ok:true, pulled:!!bt.pulled};
+    }
+    if(!silent&&window.toast) toast('云端同步启动异常：'+(bt.msg||''),'err');
+    return bt;
+  }catch(e){
+    if(!silent&&window.toast) toast('云端同步异常：'+e.message,'err');
+    return {ok:false, msg:e.message};
+  }
+};
+window.stopCloudSync=function(){ if(window.ZY) ZY.stopPoll(); };
 
 /* ============================== 年级 / 动态口令(TOTP) ============================== */
 function deriveGrade(cls){const m=(cls||'').match(/(\d+级)/);return m?m[1]:''}
@@ -374,6 +401,10 @@ function renderApp(){
     const dismissBtn=$('#syncBannerDismiss');if(dismissBtn)dismissBtn.onclick=close;
     const moreBtn=$('#syncBannerMore');if(moreBtn)moreBtn.onclick=openCloudUpgradeModal;
   }
+  /* 云端同步：管理角色登录后自动连接 Supabase（已配置时才生效） */
+  const cr=currentUser&&currentUser.role;
+  const isMgr=cr==='super'||cr==='terminal'||cr==='president'||cr==='vice'||cr==='minister'||cr==='broadcaster'||cr==='etiquette'||cr==='subleague'||cr==='dev';
+  if(isMgr){ try{ initCloudSync(true); }catch(e){} }
 }
 window.openCloudUpgradeModal=function(){
   openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>升级到云端同步（解锁全部需求）<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
