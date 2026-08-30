@@ -71,6 +71,8 @@ function seedDB(){
 }
 
 function normalizeDB(db){
+  /* 兼容无参调用（ZY.bootstrap / ZY.pullMerge 内部无参调用此函数） */
+  if(!db) db = (typeof window!=='undefined' && window.DB) ? window.DB : {};
   if(!db.rules) db.rules={scorePerPerson:0.1,deptMultiplier:0.5};
   if(!db.reports) db.reports=[];
   if(!db.logs) db.logs=[];
