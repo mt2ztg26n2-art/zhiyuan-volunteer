@@ -77,20 +77,20 @@ img{display:block;max-width:100%;}
 
 .lc-quick{margin-top:16px;padding:12px 16px 16px;background:rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.2);}
 
-/* ============================================ 单机版同步限制警告 banner ============================================ */
-.sync-banner{background:linear-gradient(90deg,#fff7e6 0%,#fff1d6 100%);border-bottom:2px solid #fa8c16;padding:0 18px;display:flex;align-items:center;gap:12px;min-height:36px;font-size:13px;color:#7a4e0a;}
-.sync-banner .sb-icon{flex-shrink:0;width:18px;height:18px;color:#fa8c16;display:flex;align-items:center;justify-content:center;}
+/* ============================================ 部署状态 banner（绿底对勾，反映前端永久化/数据同步进度） ============================================ */
+.sync-banner{background:linear-gradient(90deg,#f0f9eb 0%,#e6f7e0 100%);border-bottom:2px solid #52c41a;padding:0 18px;display:flex;align-items:center;gap:12px;min-height:36px;font-size:13px;color:#2f5d2a;}
+.sync-banner .sb-icon{flex-shrink:0;width:18px;height:18px;color:#52c41a;display:flex;align-items:center;justify-content:center;}
 .sync-banner .sb-icon svg{width:18px;height:18px;}
 .sync-banner .sb-text{flex:1;line-height:1.5;}
-.sync-banner .sb-text b{color:#a30e16;}
-.sync-banner .sb-text a{color:#c8161d;font-weight:600;text-decoration:underline;margin:0 4px;}
+.sync-banner .sb-text b{color:#237804;}
+.sync-banner .sb-text a{color:#389e0d;font-weight:600;text-decoration:underline;margin:0 4px;}
 .sync-banner .sb-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.sync-banner .sb-btn{height:26px;padding:0 12px;border-radius:2px;font-size:12px;background:#fff;color:#a30e16;box-shadow:0 0 0 1px #a30e16 inset;transition:.15s;}
-.sync-banner .sb-btn:hover{background:#a30e16;color:#fff;}
+.sync-banner .sb-btn{height:26px;padding:0 12px;border-radius:2px;font-size:12px;background:#fff;color:#237804;box-shadow:0 0 0 1px #52c41a inset;transition:.15s;}
+.sync-banner .sb-btn:hover{background:#52c41a;color:#fff;}
 .sync-banner .sb-btn.primary{background:#c8161d;color:#fff;box-shadow:none;}
 .sync-banner .sb-btn.primary:hover{background:#a30e16;}
-.sync-banner .sb-close{width:24px;height:24px;background:none;color:#7a4e0a;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:2px;}
-.sync-banner .sb-close:hover{background:rgba(122,78,10,.12);}
+.sync-banner .sb-close{width:24px;height:24px;background:none;color:#2f5d2a;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:2px;}
+.sync-banner .sb-close:hover{background:rgba(47,93,42,.12);}
 .lcq-title{text-align:center;font-size:11px;color:rgba(255,255,255,.8);margin-bottom:8px;}
 .lcq-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
 .lcq-grid button{height:28px;background:rgba(255,255,255,.14);color:#fff;font-size:12px;border-radius:0;transition:.15s;}

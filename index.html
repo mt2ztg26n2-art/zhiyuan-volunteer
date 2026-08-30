@@ -108,10 +108,10 @@
     </div>
   </header>
 
-  <!-- 单机版同步限制警告条（首次登录显示，可关闭，刷新重显） -->
+  <!-- 部署状态条：反映前端永久化/数据同步进度，给用户清晰战报 -->
   <div id="syncBanner" class="sync-banner" hidden>
-    <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86l-8.18 14.14A2 2 0 0 0 3.83 21h16.34a2 2 0 0 0 1.72-3l-8.18-14.14a2 2 0 0 0-3.42 0z" stroke-linejoin="round"/></svg></span>
-    <span class="sb-text"><b>单机版提醒：</b>当前数据仅保存本设备浏览器，换设备/清缓存即丢失，跨设备实时同步、注册审核实时通知尚未启用。<a id="syncBannerMore" href="javascript:void(0)">了解升级到云端 →</a></span>
+    <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span class="sb-text"><b>已部署：</b>永久地址上线（<a href="https://mt2ztg26n2-art.github.io/zhiyuan-volunteer/" target="_blank">mt2ztg26n2-art.github.io/zhiyuan-volunteer</a>，GitHub Pages 永久托管） · <b>数据同步：</b>跨设备实时同步待腾讯云 CloudBase 授权（微信扫码）。<a id="syncBannerMore" href="javascript:void(0)">查看进度详情 →</a></span>
     <span class="sb-actions"><button class="sb-btn" id="syncBannerDismiss">我已知晓</button></span>
     <button class="sb-close" id="syncBannerClose" title="关闭">×</button>
   </div>

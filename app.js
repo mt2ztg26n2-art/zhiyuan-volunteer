@@ -365,7 +365,7 @@ function renderApp(){
   $('#mainDate').textContent=fmtDate(now())+'  '+new Date().toLocaleTimeString('zh-CN',{hour12:false}); $('#mainPeriod').textContent=DB.period;
   renderRoute(); updateNotifyBadge();
   updateNotifyBadge();
-  /* 单机版同步限制 banner（默认显示，用户可关闭；首登或重大变更后由我重置） */
+  /* 部署状态 banner：前端已永久部署，数据同步状态实时呈现（让用户一眼看清进度） */
   const sb=$('#syncBanner');if(sb){
     const dismissed=DB.settings&&DB.settings.syncBannerDismissed;
     sb.hidden=!!dismissed;
