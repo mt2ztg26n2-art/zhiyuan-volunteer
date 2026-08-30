@@ -467,7 +467,7 @@ window.exportActivities=function(){const rows=DB.activities.map(a=>({'活动':a.
 
 /* ============================== 分享二维码（v19.17：扫码直接打开网页报名，可分享） ============================== */
 /* 生成可分享深链：扫码 → 打开平台对应活动/任务页（版本守卫保留 hash） */
-function zyShareUrl(kind,id){ return location.origin + location.pathname + '?v=19.17#' + kind + '/' + id; }
+function zyShareUrl(kind,id){ return location.origin + location.pathname + '?v=19.18#' + kind + '/' + id; }
 window.copyShareLink=function(url){
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(()=>toast('链接已复制，快去分享吧','ok')).catch(()=>toast('复制失败，请长按链接手动复制','err'));

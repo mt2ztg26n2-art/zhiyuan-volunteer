@@ -843,9 +843,10 @@ function renderRoute(){
   highlightNav();
   const map={'':renderDashboard,'dashboard':renderDashboard,'files':renderFiles,'service':renderService,'reports':renderReports,'print':renderPrint,'audit':renderAudit,'activities':renderActivities,'tasks':renderTasks,'news':renderNews,'summary':renderSummary,'notify':renderNotify,'data':renderData,'broadcaster':renderBroadcaster,'etiquette':renderEtiquette,'subleague':renderSubleague,'settings':renderSettings,'my':renderMy,'report':renderReport,'logs':renderLogs,'traces':renderTraces,'eval':renderEval,'yearKanban':renderYearKanban,'monthKanban':renderMonthKanban,'quota':renderQuota,'help':renderHelp,'other':renderOther};
   let cr=currentRoute();
-  /* v19.17 深链：扫码打开 #/act/<id> 或 #/task/<id> → 弹出对应活动/任务报名页。
+  /* v19.18 深链：扫码打开 #/act/<id> 或 #/task/<id> → 弹出对应活动/任务报名页。
+   * 注意 currentRoute() 会保留前导斜杠（#/task/x → "/task/x"），故正则允许可选 "/"。
    * 立即清除 hash（history.replaceState 不触发 hashchange），防止弹窗关闭后反复弹出。 */
-  const dm=String(cr).match(/^(act|task)\/(.+)$/);
+  const dm=String(cr).match(/^\/?(act|task)\/(.+)$/);
   if(dm){
     try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
     setTimeout(()=>{ try{ if(dm[1]==='act') window.openActShare&&openActShare(dm[2]); else window.openTaskShare&&openTaskShare(dm[2]); }catch(e){ console.error('深链处理失败',e); } }, 80);
