@@ -622,7 +622,7 @@ async function doRegister(){
     return toast(existUser.pending?'该身份证号已提交注册，正在审核中':'该身份证号已注册','err');
   }
   const photo=$('#rPhoto').files[0];
-  const finish=(avatar)=>{
+  const finish=async (avatar)=>{
     const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
     const nu={id:'u-'+next,idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now(),_regVia:'register'};
     /* CloudBase 模式：注册走云函数（服务端查重 + bcrypt + 写 pending + 通知部门管理员） */
@@ -639,9 +639,21 @@ async function doRegister(){
     /* 按部门分流通知：本部门管理员才能收到审核通知，超级/终端管理员可收到全部 */
     const auditTargets=auditNotifyTargets(org);
     pushNotify({to:auditTargets,org,kind:'audit',title:`【${org}】新注册待审核`,content:`${name} 申请加入「${org}」，请本部门管理员审核`});
-    /* 整库同步上云：pending 用户 + 审核通知一并同步，管理员端拉取后立即出现在审核中心、通知中心角标实时变化（统一走 ZY 零配置同步，不再走割裂的 zy_regs 双通道） */
-    if(window.ZY){ ZY.push().catch(()=>{}); }
-    toast('注册成功！已同步云端，请等待本部门管理员审核','ok');$('#registerModal').hidden=true;
+    /* 云端同步【v19.9 关键修复】：等待真实上传结果，不再 fire-and-forget 假成功。
+     * 旧版 ZY.push().catch(()=>{}) 在手机弱网/超时时静默失败，提示"已同步云端"但数据根本没上云，
+     * 导致电脑端永远看不到审核。现在：await 真实结果 → 失败明确提示 + markDirty 触发轮询自动重试。 */
+    let syncOk=true, syncMsg='';
+    if(window.ZY && ZY.push){
+      try{
+        const r=await ZY.push();
+        syncOk=!!(r&&r.ok);
+        syncMsg=(r&&r.msg)||'';
+      }catch(e){ syncOk=false; syncMsg=e.message; }
+      if(!syncOk && window.ZY.markDirty) window.ZY.markDirty(); /* 15秒轮询会自动重试上传 */
+    }
+    $('#registerModal').hidden=true;
+    if(syncOk) toast('注册成功！已同步云端，请等待本部门管理员审核','ok');
+    else toast('注册已提交（本机已保存），云端同步失败：'+(syncMsg||'网络异常')+'，系统会自动重试，请勿关闭页面','err');
   };
   if(photo){const r=new FileReader();r.onload=()=>finish(r.result);r.readAsDataURL(photo)}else finish('');
 }
