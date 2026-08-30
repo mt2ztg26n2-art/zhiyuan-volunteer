@@ -89,15 +89,25 @@ window.ZY = (function(){
     }catch(e){ setState('err','网络错误：'+e.message); return {ok:false, msg:'网络错误：'+e.message}; }
   }
 
-  /* 【v19.0 关键修复】改用 UPSERT（POST + merge-duplicates）并强制校验真实写入行数。
-   * 旧版用 PATCH ?id=eq.1，一旦 id=1 那行被删（历史 resetDB 会整行 DELETE），
-   * PostgREST 对「0 行匹配」的 PATCH 仍返回 204 → 代码误判上传成功，
-   * 数据实际从未落云端，造成「提示已同步但换设备什么都没有」。
-   * 现在：upsert 必然创建或更新 id=1，并用 return=representation 校验行确实写入。 */
+  /* 【v19.1 关键修复】push 改为「先拉云端合并、再上传」。
+   * 旧版 push 直接把 window.DB 整本加密覆盖云端 → 一旦某设备本机是残缺/空库
+   * （清除数据后未同步、新设备首次打开、localStorage 异常），注册一 push 就把
+   * 空库盖到云端，管理员端拉到的永远是空 → 「注册了看不到审核/通知」。
+   * 现在：先 pull 云端 → mergeDB(本地, 云端)（云权威 + 保留本地独有）→ 上传合并结果。
+   * 任何设备上传都不会丢云端已有数据，本地新注册也必达云端。 */
   async function push(){
     const db = window.DB || {};
     try{
-      const enc = await encrypt(db);
+      /* 1) 先拉云端，合并后再上传（防空库覆盖） */
+      let target = db;
+      try{
+        const p = await pullRaw();
+        if(p.ok && p.data && !p.empty){
+          target = mergeDB(db, p.data);
+        }
+      }catch(e){ /* 云端拉取失败则直接上传本地 */ }
+      /* 2) 上传（UPSERT + 校验真实写入） */
+      const enc = await encrypt(target);
       const r = await fetch(CFG.url + '/rest/v1/zy_db', {
         method: 'POST',
         headers: {
@@ -122,6 +132,20 @@ window.ZY = (function(){
       setState('ok');
       return {ok:true, bytes: enc.length};
     }catch(e){ setState('err','网络错误：'+e.message); return {ok:false, msg:'网络错误：'+e.message}; }
+  }
+  /* 轻量拉取（不触发状态提示，供 push 合并用） */
+  async function pullRaw(){
+    try{
+      const r = await fetch(CFG.url + '/rest/v1/zy_db?select=id,data,updated_at&id=eq.1', {
+        headers: {'apikey':CFG.key, 'Authorization':'Bearer '+CFG.key}
+      });
+      const j = await r.json();
+      if(!r.ok) return {ok:false};
+      const row = j[0];
+      if(!j.length || !row || typeof row.data !== 'string' || !row.data) return {ok:true, empty:true};
+      const dec = await decrypt(row.data);
+      return {ok:true, data:dec};
+    }catch(e){ return {ok:false}; }
   }
 
   function markDirty(){ dirty = true; scheduleFlush(); }
@@ -262,6 +286,23 @@ window.ZY = (function(){
     return out;
   }
 
+  /* ---------- 拉取并立即合并进本机（审核中心/手动同步用；pull 只返回数据不 merge） ---------- */
+  async function pullMerge(){
+    const p = await pull();
+    if(p.ok && p.data && !p.empty){
+      const backup = window.DB;
+      try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
+      window.DB = mergeDB(window.DB||{}, p.data);
+      if(window.normalizeDB) window.normalizeDB();
+      if(window.saveDB) window.saveDB();
+      if(window.renderRoute) window.renderRoute();
+      if(window.updateNotifyBadge) window.updateNotifyBadge();
+      if(window._cloudMergeCb) window._cloudMergeCb(window.DB, backup);
+      return {ok:true, merged:true};
+    }
+    return p;
+  }
+
   /* ---------- 首次接入：本地与云端合并（谁的数据都不丢），再回传云端 ---------- */
   async function bootstrap(){
     const p = await pull();
@@ -315,7 +356,7 @@ window.ZY = (function(){
   }catch(e){}
 
   return {
-    pull, push, bootstrap, markDirty, startPoll, stopPoll, syncNow,
+    pull, push, bootstrap, markDirty, startPoll, stopPoll, syncNow, pullMerge,
     tomb, tombMany, getState,
     get cfg(){ return CFG; }
   };

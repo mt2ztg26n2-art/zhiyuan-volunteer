@@ -213,9 +213,10 @@ window.zySyncRegs=async function(silent){
     let added=0, first='';
     const beforeCount=(DB.users||[]).filter(u=>u.pending).length;
 
-    /* 1) 主库强制拉取：注册已通过 ZY.push 写入 zy_db，直接拉整库即可拿到 pending 用户 + 通知 */
-    if(window.ZY && ZY.pull){
-      const pullRes=await ZY.pull(true);
+    /* 1) 主库强制拉取+合并：注册已通过 ZY.push 写入 zy_db，直接拉整库合并进本机，
+          即可拿到 pending 用户 + 通知（v19.1 修复：旧版只 pull 不 merge，审核中心永远看不到） */
+    if(window.ZY && ZY.pullMerge){
+      const pullRes=await ZY.pullMerge();
       if(!pullRes.ok && !silent){ toast('云端主库同步失败：'+(pullRes.msg||''),'err'); }
     }
 
