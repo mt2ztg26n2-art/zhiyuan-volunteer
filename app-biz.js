@@ -228,8 +228,7 @@ window.zySyncRegs=async function(silent){
           const d=r.data||{};
           if(!d.idCard||!d.name) return;
           if(DB.users.some(u=>u.idCard===d.idCard)) return;
-          const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
-          DB.users.push({id:'u-'+next,idCard:d.idCard,pwd:'',role:'member',org:d.org||'青年志愿者协会',name:d.name,gender:d.gender||'',birth:d.birth||'',nation:d.nation||'',politics:d.politics||'',religion:d.religion||'',school:d.school||'',dept:d.dept||'',cls:d.cls||'',grade:(window.deriveGrade?deriveGrade(d.cls):'')||'',phone:d.phone||'',email:d.email||'',qq:d.qq||'',wechat:d.wechat||'',native:d.native||'',addr:d.addr||'',title:d.title||'青年志愿者',avatar:d.avatar||'',exp:d.exp||'',position:'志愿者',activated:false,pending:true,createdAt:d.createdAt||now(),_cloudRegId:r.id});
+          DB.users.push({id:newUserId(),idCard:d.idCard,pwd:'',role:'member',org:d.org||'青年志愿者协会',name:d.name,gender:d.gender||'',birth:d.birth||'',nation:d.nation||'',politics:d.politics||'',religion:d.religion||'',school:d.school||'',dept:d.dept||'',cls:d.cls||'',grade:(window.deriveGrade?deriveGrade(d.cls):'')||'',phone:d.phone||'',email:d.email||'',qq:d.qq||'',wechat:d.wechat||'',native:d.native||'',addr:d.addr||'',title:d.title||'青年志愿者',avatar:d.avatar||'',exp:d.exp||'',position:'志愿者',activated:false,pending:true,createdAt:d.createdAt||now(),_cloudRegId:r.id});
           added++; if(!first) first=d.name;
         });
       }

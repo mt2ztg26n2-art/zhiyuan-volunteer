@@ -231,6 +231,9 @@ const $=(s,el)=>(el||document).querySelector(s);
 const $$=(s,el)=>Array.from((el||document).querySelectorAll(s));
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function uid(p){return (p||'r')+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+/* 全局唯一用户 ID：避免不同设备离线各自 +1 撞号（同 id 在合并时被 union 折叠 → 数据丢失）。
+ * 用 uid('u-')（时间戳+随机）保证任意两台设备生成的 id 绝不相同。 */
+function newUserId(){return uid('u-')}
 function now(){const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`}
 function today(){return now().slice(0,10)}
 function fmtDate(s){if(!s)return'';const d=new Date(s);if(isNaN(d))return s;return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -418,10 +421,10 @@ function renderApp(){
     const closeBtn=$('#syncBannerClose');if(closeBtn)closeBtn.onclick=close;
     const dismissBtn=$('#syncBannerDismiss');if(dismissBtn)dismissBtn.onclick=close;
   }
-  /* 云端同步：仅管理角色同步全量数据（普通成员只走审核状态通道，不持有全量密文，防信息泄露） */
-  const cr=currentUser&&currentUser.role;
-  const isMgr=cr==='super'||cr==='terminal'||cr==='president'||cr==='vice'||cr==='minister'||cr==='broadcaster'||cr==='etiquette'||cr==='subleague'||cr==='dev';
-  if(isMgr && window.ZY){
+  /* 云端同步：所有角色都开启（整库密文在登录时已拉取，本机本就持有全量，
+   * 不开启轮询只会让成员端数据停滞、不同设备/账号对不上。去掉管理角色限制，
+   * 所有登录用户都实时同步，消除"手机/电脑数据不一致"。 */
+  if(window.ZY){
     try{ initCloudSync(true); }catch(e){}
   }
 }
@@ -623,8 +626,7 @@ async function doRegister(){
   }
   const photo=$('#rPhoto').files[0];
   const finish=async (avatar)=>{
-    const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
-    const nu={id:'u-'+next,idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now(),_regVia:'register'};
+    const nu={id:newUserId(),idCard:id,pwd,role:'member',org,name,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,grade:deriveGrade($('#rCls').value),phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,position:'志愿者',activated:false,pending:true,createdAt:now(),_regVia:'register'};
     /* CloudBase 模式：注册走云函数（服务端查重 + bcrypt + 写 pending + 通知部门管理员） */
     if(window.ZY && ZY.cloud && ZY.register){
       ZY.register(nu).then(r=>{
@@ -1110,8 +1112,7 @@ window.openUserForm=function(existing){
         if($('#ufPwd').value)t.pwd=$('#ufPwd').value;
         pushLog('修改档案',`修改 ${t.name}`);
       }else{
-        const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
-        DB.users.push({id:'u-'+next,idCard,name,pwd:$('#ufPwd').value,role:$('#ufRole').value,org:$('#ufOrg').value,gender:$('#ufGender').value,birth:$('#ufBirth').value,nation:$('#ufNation').value,politics:$('#ufPolitics').value,religion:$('#ufReligion').value,dept:$('#ufDept').value,cls:$('#ufCls').value,title:$('#ufTitle').value,email:$('#ufEmail').value,phone:$('#ufPhone').value,qq:$('#ufQQ').value,wechat:$('#ufWechat').value,native:$('#ufNative').value,addr:$('#ufAddr').value,live:$('#ufLive').value,edu:$('#ufEdu').value,status:$('#ufStatus').value,avatar,exp:$('#ufExp').value,hobby:$('#ufHobby').value,position:'志愿者',activated:true,pending:false,createdAt:now()},collectUfExtra());
+        DB.users.push({id:newUserId(),idCard,name,pwd:$('#ufPwd').value,role:$('#ufRole').value,org:$('#ufOrg').value,gender:$('#ufGender').value,birth:$('#ufBirth').value,nation:$('#ufNation').value,politics:$('#ufPolitics').value,religion:$('#ufReligion').value,dept:$('#ufDept').value,cls:$('#ufCls').value,title:$('#ufTitle').value,email:$('#ufEmail').value,phone:$('#ufPhone').value,qq:$('#ufQQ').value,wechat:$('#ufWechat').value,native:$('#ufNative').value,addr:$('#ufAddr').value,live:$('#ufLive').value,edu:$('#ufEdu').value,status:$('#ufStatus').value,avatar,exp:$('#ufExp').value,hobby:$('#ufHobby').value,position:'志愿者',activated:true,pending:false,createdAt:now()},collectUfExtra());
         pushLog('录入档案',`录入 ${name}`);
       }
       saveDB();closeModal();toast(isEdit?'已保存':'已录入','ok');
@@ -1255,7 +1256,7 @@ window.openBatchImport=function(){
   openModal(`<div class="modal"><div class="modal-title"><span class="bar"></span>批量导入档案<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><p class="warn">先「下载模板」填写后上传；身份证+姓名重复自动跳过。</p><div class="form-grid cols-1"><label>选择文件<input id="impFile" type="file" accept=".xlsx,.xls,.csv"></label></div><div id="impPreview" class="mt-12"></div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="impSubmit">开始导入</button></div></div>`);
   let rows=[];
   $('#impFile').onchange=(ev)=>{const file=ev.target.files[0];if(!file)return;const rd=new FileReader();rd.onload=(e)=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const data=XLSX.utils.sheet_to_json(ws,{header:1});const hd=data[0];const mapKey={'姓名':'name','身份证号':'idCard','性别':'gender','出生年月':'birth','民族':'nation','籍贯':'native','政治面貌':'politics','宗教信仰':'religion','专业部':'dept','班级':'cls','所在部门':'org','职位':'title','邮箱':'email','联系电话':'phone','QQ/微信':'qq','所在学校':'school','居住地址':'addr','是否住校':'live','教育程度':'edu','个人经历':'exp','志愿服务经历':'vexp','兴趣爱好':'hobby'};rows=data.slice(1).filter(r=>r[0]&&r[1]).map(r=>{const o={};hd.forEach((h,i)=>{if(h&&r[i]!=null)o[mapKey[String(h).trim()]||String(h).trim()]=String(r[i]).trim()});return o});$('#impPreview').innerHTML=`<div class="tip-line">识别到 <b>${rows.length}</b> 条</div>`}catch(err){toast('文件解析失败','err')}};rd.readAsArrayBuffer(file)};
-  $('#impSubmit').onclick=()=>{if(!rows.length)return toast('请先选择文件','err');let added=0;rows.forEach(r=>{if(!r.idCard||!r.name)return;if(DB.users.some(u=>u.idCard===r.idCard))return;const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);DB.users.push(Object.assign({id:'u-'+next,role:'member',org:'青年志愿者协会',title:'志愿者',nation:'汉族',politics:'群众',religion:'无',school:DB.school,position:'志愿者',pwd:'123456',activated:true,pending:false,status:'正常在岗',createdAt:now()},r));added++});saveDB();closeModal();filesSearch();toast(`成功导入 ${added} 条`,'ok')};
+  $('#impSubmit').onclick=()=>{if(!rows.length)return toast('请先选择文件','err');let added=0;rows.forEach(r=>{if(!r.idCard||!r.name)return;if(DB.users.some(u=>u.idCard===r.idCard))return;DB.users.push(Object.assign({id:newUserId(),role:'member',org:'青年志愿者协会',title:'志愿者',nation:'汉族',politics:'群众',religion:'无',school:DB.school,position:'志愿者',pwd:'123456',activated:true,pending:false,status:'正常在岗',createdAt:now()},r));added++});saveDB();closeModal();filesSearch();toast(`成功导入 ${added} 条`,'ok')};
 };
 window.exportFilesList=function(){
   const rows=DB.users.filter(u=>u.role!=='dev').map(u=>({'姓名':u.name,'性别':u.gender,'专业部':u.dept,'班级':u.cls,'部门':u.org,'职位':u.title,'角色':roleLabel(u.role),'身份证号':u.idCard,'电话':u.phone,'邮箱':u.email,'政治面貌':u.politics,'状态':u.status||'正常在岗'}));
