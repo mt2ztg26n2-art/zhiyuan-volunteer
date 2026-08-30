@@ -150,6 +150,15 @@ function loadDB(){
 function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
 function resetDB(){
   if(!confirm('确定清除所有数据并恢复初始演示数据吗？该操作不可恢复，请先导出 Excel 备份！')) return;
+  /* 云端同步清空（防止其它设备把旧数据又拉回来） */
+  try{
+    if(window.ZY){
+      const c=ZY.cfg;
+      fetch(c.url+'/rest/v1/zy_db?id=eq.1',{method:'PATCH',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({data:{}})});
+      fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}});
+      fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}});
+    }
+  }catch(e){}
   localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_USR); location.reload();
 }
 /* 云端同步：零配置，所有用户登录后自动连接（数据自动多设备同步） */
@@ -405,8 +414,10 @@ function renderApp(){
     const dismissBtn=$('#syncBannerDismiss');if(dismissBtn)dismissBtn.onclick=close;
     const moreBtn=$('#syncBannerMore');if(moreBtn)moreBtn.onclick=openCloudUpgradeModal;
   }
-  /* 云端同步：零配置，所有用户登录后自动连接（最高权限者无需逐台配置，全设备自动互通） */
-  if(window.ZY){
+  /* 云端同步：仅管理角色同步全量数据（普通成员只走审核状态通道，不持有全量密文，防信息泄露） */
+  const cr=currentUser&&currentUser.role;
+  const isMgr=cr==='super'||cr==='terminal'||cr==='president'||cr==='vice'||cr==='minister'||cr==='broadcaster'||cr==='etiquette'||cr==='subleague'||cr==='dev';
+  if(isMgr && window.ZY){
     try{ initCloudSync(true); }catch(e){}
   }
 }
