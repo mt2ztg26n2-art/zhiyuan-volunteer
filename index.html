@@ -6,19 +6,27 @@
 <title>宣汉职业中专学校 · 志愿服务智慧管理平台</title>
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="apple-touch-icon" href="logo.png">
-<!-- 【v19.7 版本守卫】旧缓存页面加载本文件时，若引用的版本戳低于当前版本，强制跳转最新版，
-     彻底解决手机/电脑打开裸地址后浏览器缓存旧 JS 导致的"数据不同步/申请不显示" -->
+<!-- 【v19.11 版本守卫】旧缓存页面加载本文件时，若引用的版本戳低于当前版本，强制跳转最新版，
+     彻底解决手机/电脑打开裸地址后浏览器缓存旧 JS 导致的"数据不同步/申请不显示"。
+     v19.11 修复两个致命 bug：
+     1) 旧版用 parseFloat 比较版本号：parseFloat('19.10')=19.1 < 19.7 → 误判 19.10 太旧反复跳转
+     2) 旧版拼接 URL 用 location.href.split('?')[0]+'&v='：已有 ?v= 时变成 .../&v=19.7 → 404 -->
 <script>
 (function(){
-  var V='19.7';
-  var m=location.href.match(/[?&]v=([0-9.]+)/);
-  if(!m || parseFloat(m[1])<parseFloat(V)){
-    var sep=location.href.indexOf('?')>=0?'&':'?';
-    location.replace(location.href.split('?')[0]+sep+'v='+V);
+  var V='19.11';
+  var cur=(location.href.match(/[?&]v=([0-9.]+)/)||[])[1]||'';
+  /* 版本逐段数字比较：19.10 > 19.9 > 19.7 */
+  function cmp(a,b){
+    var A=String(a).split('.').map(Number), B=String(b).split('.').map(Number);
+    for(var i=0;i<Math.max(A.length,B.length);i++){ var x=A[i]||0, y=B[i]||0; if(x!==y) return x>y?1:-1; }
+    return 0;
+  }
+  if(!cur || cmp(cur,V)<0){
+    location.replace(location.pathname+'?v='+V);
   }
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=19.10">
+<link rel="stylesheet" href="styles.css?v=19.11">
 </head>
 <body>
 
@@ -221,9 +229,9 @@
 <script defer src="vendor/jspdf.umd.min.js"></script>
 <script defer src="vendor/jspdf.plugin.autotable.min.js"></script>
 <script defer src="vendor/qrcode-gen.js"></script>
-<script defer src="app.js?v=19.10"></script>
-<script defer src="app-biz.js?v=19.10"></script>
-<script defer src="zy-sync.js?v=19.10"></script>
-<script defer src="demo-data.js?v=19.10"></script>
+<script defer src="app.js?v=19.11"></script>
+<script defer src="app-biz.js?v=19.11"></script>
+<script defer src="zy-sync.js?v=19.11"></script>
+<script defer src="demo-data.js?v=19.11"></script>
 </body>
 </html>
