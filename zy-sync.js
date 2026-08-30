@@ -334,21 +334,42 @@ window.ZY = (function(){
     return out;
   }
 
-  /* ---------- 用户合并（状态感知：activated 终态优先，其余取较新 updatedAt） ---------- */
+  function recMsOf(x){
+    if(!x) return 0;
+    const raw=Number(x.updatedAtMs)||Number(x.updatedAt)||0;
+    if(raw>1e11) return raw;                                  // 毫秒时间戳（Date.now()）
+    if(x.updatedAt) return Date.parse(String(x.updatedAt))||0; // "YYYY-MM-DD HH:mm:ss"
+    return 0;
+  }
+  /* ---------- 用户合并（v19.16：时间戳新者胜 + 激活终态作平局裁决 + 年龄感知墓碑） ---------- */
   function mergeUsers(localArr, cloudArr, tombs){
     const map={};
     const pick=(a,b)=>{
       if(!a) return b;
       if(!b) return a;
+      /* v19.16 关键：先比时间戳，较新者胜——管理员升职/审核/改角色都带新 updatedAt，
+         天然覆盖其它设备的旧副本；旧"已激活"副本不再压过"清除后新注册"的 pending。
+         时间戳相同（或无）时：已激活者胜（防"审核通过又变回待审"），再退本地。 */
+      const aMs=recMsOf(a), bMs=recMsOf(b);
+      if(aMs!==bMs) return aMs>bMs?a:b;
       const aAct=a.activated===true, bAct=b.activated===true;
       if(aAct!==bAct) return aAct?a:b;
-      const at=Number(a.updatedAt||0), bt=Number(b.updatedAt||0);
-      if(at||bt) return bt>at?b:a;
       return b;
     };
     (cloudArr||[]).forEach(x=>{ if(x && x.idCard) map[x.idCard]=pick(map[x.idCard],x); });
     (localArr||[]).forEach(x=>{ if(x && x.idCard) map[x.idCard]=pick(map[x.idCard],x); });
-    if(tombs){ Object.keys(map).forEach(k=>{ if(tombs['users:'+k]) delete map[k]; }); }
+    /* 年龄感知墓碑：只压"不晚于清除时刻"的旧数据。
+     * 清除后重新注册的新记录（updatedAt 晚于墓碑时间）天然存活——
+     * 即使手机跑旧版本代码、没走 untombPush，新注册的 pending 也不会被墓碑过滤，
+     * 电脑端审核中心才能看到。无时间戳的旧数据按"被清除"处理。 */
+    if(tombs){ Object.keys(map).forEach(k=>{
+        const t=Number(tombs['users:'+k]);
+        if(t){
+          const recMs=recMsOf(map[k]);
+          if(!recMs || recMs<=t) delete map[k];
+        }
+      });
+    }
     return Object.values(map);
   }
 
