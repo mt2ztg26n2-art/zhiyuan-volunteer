@@ -152,6 +152,21 @@ function normalizeDB(db){
   if(!db.evaluations) db.evaluations=[];
   if(!db.quotas) db.quotas=[];
   if(!db.nextIds) db.nextIds={};
+  /* v18 演示数据自动注入：仅当业务数据完全为空时注入一次（不覆盖已录入的真实数据），
+     解决"终端管理员登录后看不到演示数据"的问题；已录真实数据的不注入 */
+  if((db.activities||[]).length===0 && (db.services||[]).length===0 && !db._demoV){
+    const sd=seedDB();
+    db.activities=sd.activities||[];
+    db.services=sd.services||[];
+    if(!(db.tasks||[]).length) db.tasks=sd.tasks||[];
+    if(!(db.broadcastRecs||[]).length) db.broadcastRecs=sd.broadcastRecs||[];
+    if(!(db.etiquetteRecs||[]).length) db.etiquetteRecs=sd.etiquetteRecs||[];
+    if(!(db.subleagueRecs||[]).length) db.subleagueRecs=sd.subleagueRecs||[];
+    if(!(db.quotas||[]).length) db.quotas=sd.quotas||[];
+    if(!(db.news||[]).length) db.news=sd.news||[];
+    if(!(db.notifies||[]).length) db.notifies=sd.notifies||[];
+    db._demoV=1;
+  }
   // 系统管理员账号（仅存在一次）：u-system（本人系统级账号）
   if(!db.users.some(u=>u.id==='u-system')){
     const sysSeed=(seedDB().users||[]).find(u=>u.id==='u-system');
@@ -171,8 +186,7 @@ function normalizeDB(db){
   }
   // 一次性合并种子账号（v13 新增广播站/礼仪队/团副总支成员等），按身份证去重；带版本标记避免已删档案复活
   if(!db._seedV){
-    (seedDB().users||[]).forEach(su=>{ if(!db.users.some(u=>u.idCard===su.idCard)) db.users.push(su); });
-    db._seedV=2;
+    (seedDB().users||[]).forEach(su=>{ if(!db.users.some(u=>u.idCard===su.idCard)) db.users.push(su); });    db._seedV=2;
   }
   (db.users||[]).forEach(u=>{
     if(!u.grade) u.grade=deriveGrade(u.cls||'');
