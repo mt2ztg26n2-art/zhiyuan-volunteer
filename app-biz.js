@@ -1438,8 +1438,16 @@ window.clearAllDemo=async function(){
   DB.nextIds={user:100,service:10,activity:10,task:10,news:10,notify:10,summary:10,report:10};
   saveDB();
   /* 关键修复：必须等待云端上传完成再返回，否则退出登录/刷新会把"清空"打断，
-     云端仍是旧演示数据，重新登录又被同步回来，演示数据"死灰复燃" */
-  try{ if(window.ZY){ const p=await ZY.push(); if(p&&!p.ok) toast('本地已清空，但云端同步失败：'+(p.msg||'')+'，请检查网络后重试','err'); } }catch(e){}
+     云端仍是旧演示数据，重新登录又被同步回来，演示数据"死灰复燃"。
+     同时清空注册队列 zy_regs 与审核状态 zy_status，释放被占用的身份证 */
+  try{
+    if(window.ZY){
+      const p=await ZY.push(); if(p&&!p.ok) toast('本地已清空，但云端同步失败：'+(p.msg||'')+'，请检查网络后重试','err');
+      const c=ZY.cfg, h={'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json'};
+      await fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:h});
+      await fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:h});
+    }
+  }catch(e){}
   if(window.renderRoute) renderRoute();
   if(window.updateNotifyBadge) updateNotifyBadge();
   if(window.buildSidebar) buildSidebar();

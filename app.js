@@ -117,15 +117,17 @@ function loadDB(){
   DB = normalizeDB(seedDB()); saveDB(); return DB;
 }
 function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
-function resetDB(){
+async function resetDB(){
   if(!confirm('确定清除所有数据并恢复到初始纯净状态（不含演示数据）吗？该操作不可恢复，请先导出 Excel 备份！')) return;
-  /* 云端写入"重置标记"（防止其它设备把空/旧数据推上来；首个有数据的设备会自动重新初始化云端） */
+  /* 关键：必须等云端三张表真正清空完成，再清本地并刷新；否则刷新会打断清空请求，
+     云端仍是旧数据（含已注册身份证），重新登录又被同步拉回，身份证"死灰复燃"被占用 */
   try{
     if(window.ZY){
-      const c=ZY.cfg;
-      fetch(c.url+'/rest/v1/zy_db?id=eq.1',{method:'PATCH',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({data:{__reset:1}})});
-      fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}});
-      fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}});
+      try{ if(ZY.stopPoll) ZY.stopPoll(); }catch(e){}
+      const c=ZY.cfg, h={'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json'};
+      await fetch(c.url+'/rest/v1/zy_db?id=not.is.null',{method:'DELETE',headers:h});
+      await fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:h});
+      await fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:h});
     }
   }catch(e){}
   localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_USR); location.reload();
