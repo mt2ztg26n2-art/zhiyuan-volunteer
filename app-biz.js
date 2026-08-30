@@ -45,28 +45,26 @@ function svPage(p){_svPage=p;serviceSearch()}
 window.delService=(id)=>confirmDialog('确认删除该条服务记录？',()=>{DB.services=DB.services.filter(s=>s.id!==id);saveDB();serviceSearch();toast('已删除','ok')});
 window.openServiceForm=function(existing){
   const s=existing?DB.services.find(x=>x.id===existing):null,isEdit=!!s;
-  openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>${isEdit?'编辑服务':'录入服务'}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid cols-3">
-    <label>活动名称<i>*</i><input id="sfAct" value="${esc(s?.activity||'')}"></label>
+  openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>${isEdit?'编辑服务':'录入服务'}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid cols-2">
+    <label>活动名称<i>*</i><input id="sfAct" value="${esc(s?.activity||'')}" placeholder="如：五四诵唱比赛志愿服务"></label>
     <label>专业部<select id="sfDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${s?.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="sfCls"><option value="">-</option></select></label>
-    <label>姓名<i>*</i><input id="sfName" value="${esc(s?.name||'')}"></label>
-    <label>身份证号<input id="sfIdCard" maxlength="18" value="${esc(s?.idCard||'')}"></label>
+    <label>班级（文本直接输入）<input id="sfCls" value="${esc(s?.cls||'')}" placeholder="如：24级会计1班（可直接输新班级，无需预建）"></label>
+    <label>姓名<i>*</i><input id="sfName" value="${esc(s?.name||'')}" placeholder="参与人姓名"></label>
+    <label>身份证号<input id="sfIdCard" maxlength="18" value="${esc(s?.idCard||'')}" placeholder="选填，用于档案关联"></label>
     <label>天数（自定义）<input id="sfDays" type="number" value="${s?.days||1}" min="1"></label>
     <label>开始时间<i>*</i><input id="sfStart" type="datetime-local" value="${esc(s?.startDT||'')}"></label>
     <label>结束时间<i>*</i><input id="sfEnd" type="datetime-local" value="${esc(s?.endDT||'')}"></label>
-    <label>服务地点<input id="sfLoc" value="${esc(s?.location||'')}"></label>
+    <label>服务地点<input id="sfLoc" value="${esc(s?.location||'')}" placeholder="如：校体育馆"></label>
     <label>负责人<input id="sfBy" value="${esc(s?.serviceBy||currentUser?.name||'')}"></label>
-    <label>时长（自动）<input id="sfDur" value="${durationHours(s?.startDT,s?.endDT)}" disabled></label>
-    <label class="full">备注<textarea id="sfNote"></textarea></label>
+    <label>时长（自动计算）<input id="sfDur" value="${durationHours(s?.startDT,s?.endDT)}" disabled></label>
+    <label class="full">备注<textarea id="sfNote">${esc(s?.note||'')}</textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="sfSave">${isEdit?'保存':'录入'}</button></div></div>`);
-  const setCls=()=>{const list=(DB.dictionaries.classes[$('#sfDept').value]||[]);$('#sfCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${s?.cls===c?'selected':''}>${c}</option>`).join('')};
-  setCls();$('#sfDept').onchange=setCls;
   const upd=()=>{$('#sfDur').value=durationHours($('#sfStart').value,$('#sfEnd').value)};
   $('#sfStart').onchange=upd;$('#sfEnd').onchange=upd;
   $('#sfSave').onclick=()=>{
     const activity=$('#sfAct').value.trim(),name=$('#sfName').value.trim(),start=$('#sfStart').value,end=$('#sfEnd').value;
     if(!activity||!name||!start||!end)return toast('请填写完整','err');
-    const o={activity,name,idCard:$('#sfIdCard').value,dept:$('#sfDept').value,cls:$('#sfCls').value,days:parseInt($('#sfDays').value)||1,startDT:start,endDT:end,location:$('#sfLoc').value,serviceBy:$('#sfBy').value,recordType:'manual'};
+    const o={activity,name,idCard:$('#sfIdCard').value,dept:$('#sfDept').value,cls:$('#sfCls').value,days:parseInt($('#sfDays').value)||1,startDT:start,endDT:end,location:$('#sfLoc').value,serviceBy:$('#sfBy').value,note:$('#sfNote').value,recordType:'manual'};
     if(isEdit)Object.assign(s,o);else DB.services.push(Object.assign({id:uid('s'),createdAt:now()},o));
     saveDB();closeModal();if(currentRoute()==='service')serviceSearch();toast('已保存','ok');
   };
