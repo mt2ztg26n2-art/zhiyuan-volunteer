@@ -147,31 +147,23 @@ function loadDB(){
   try{ const s=localStorage.getItem(LS_KEY); if(s){ DB=normalizeDB(JSON.parse(s)); return DB; } }  catch(e){}
   DB = normalizeDB(seedDB()); saveDB(); return DB;
 }
-function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && ZY.token && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
+function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
 function resetDB(){
   if(!confirm('确定清除所有数据并恢复初始演示数据吗？该操作不可恢复，请先导出 Excel 备份！')) return;
   localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_USR); location.reload();
 }
-/* 云端同步：登录后由管理角色调用，连接 Supabase 并启动多设备轮询 */
+/* 云端同步：零配置，所有用户登录后自动连接（数据自动多设备同步） */
 window.initCloudSync=async function(silent){
   try{
-    const cfg=ZY.loadCfg();
-    if(!cfg||!ZY.isCfg()){
-      if(!silent&&window.toast) toast('未配置云端同步：请到「系统设置 → 云端同步」填写配置','err');
-      return {ok:false, msg:'未配置'};
-    }
-    const lg=await ZY.login();
-    if(!lg.ok){
-      if(!silent&&window.toast) toast('云端登录失败：'+lg.msg,'err');
-      return lg;
-    }
+    if(!window.ZY) return {ok:false, msg:'同步模块未加载'};
     const bt=await ZY.bootstrap();
     if(bt.ok){
       ZY.startPoll();
       if(!silent&&window.toast) toast(bt.pulled?'已连接云端并载入云端数据（多设备实时同步开启）':'已连接云端，本地数据已上传（多设备实时同步开启）','ok');
       return {ok:true, pulled:!!bt.pulled};
     }
-    if(!silent&&window.toast) toast('云端同步启动异常：'+(bt.msg||''),'err');
+    if(bt.decryptFail){ if(!silent&&window.toast) toast('云端数据解密失败（版本不匹配），请点击「立即上传本地」覆盖云端','err'); }
+    else if(!silent&&window.toast) toast('云端同步异常：'+(bt.msg||''),'err');
     return bt;
   }catch(e){
     if(!silent&&window.toast) toast('云端同步异常：'+e.message,'err');
@@ -413,22 +405,9 @@ function renderApp(){
     const dismissBtn=$('#syncBannerDismiss');if(dismissBtn)dismissBtn.onclick=close;
     const moreBtn=$('#syncBannerMore');if(moreBtn)moreBtn.onclick=openCloudUpgradeModal;
   }
-  /* 云端同步：管理角色登录后自动连接 Supabase（已配置时才生效） */
-  const cr=currentUser&&currentUser.role;
-  const isMgr=cr==='super'||cr==='terminal'||cr==='president'||cr==='vice'||cr==='minister'||cr==='broadcaster'||cr==='etiquette'||cr==='subleague'||cr==='dev';
-  if(isMgr){
-    try{
-      const _c=window.ZY&&ZY.loadCfg();
-      if(_c&&_c.url&&_c.key&&_c.email&&_c.pwd){ initCloudSync(true); }
-      else {
-        window._syncNeedSetup=true;
-        setTimeout(()=>{
-          if(window._syncNeedSetup&&window.toast){
-            toast('本设备未开启云端同步：请到「系统设置 → 云端同步」填邮箱+密码一次，本设备数据才会与手机/其它电脑互通','err',6000);
-          }
-        },1200);
-      }
-    }catch(e){}
+  /* 云端同步：零配置，所有用户登录后自动连接（最高权限者无需逐台配置，全设备自动互通） */
+  if(window.ZY){
+    try{ initCloudSync(true); }catch(e){}
   }
 }
 window.openCloudUpgradeModal=function(){
@@ -578,12 +557,12 @@ function doRegister(){
     pushLog('注册',`新注册 ${name}，待审核`);
     pushNotify({to:'超级管理员',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
     pushNotify({to:'会 长',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
-    /* 云端注册通道：同时把注册申请写入 Supabase zy_regs，电脑端管理员自动拉到审核中心 */
-    const regPayload={idCard:id,name,pwd,org:$('#rOrg').value,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,createdAt:now()};
+    /* 云端注册通道：同时把注册申请写入 Supabase zy_regs，电脑端管理员自动拉到审核中心（零配置） */
+    const regPayload={idCard:id,name,org:$('#rOrg').value,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,createdAt:now()};
     if(window.ZYReg){
       ZYReg.submit(regPayload).then(res=>{
-        if(res.ok){ toast('注册已提交云端，等待审核','ok'); }
-        else { toast('注册已保存本机，云端同步未开启（可在系统设置配置后管理员电脑端查看）','err'); }
+        if(res.ok){ toast('注册已提交云端，等待管理员审核','ok'); }
+        else { toast('注册已保存本机（云端通道暂不可用）','err'); }
       });
     }
     toast('注册成功！请等待超级管理员审核','ok');$('#registerModal').hidden=true;

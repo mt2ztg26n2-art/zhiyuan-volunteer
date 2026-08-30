@@ -204,12 +204,11 @@ function renderAudit(root){
   /* 自动拉取云端注册（手机端提交的）合并进审核中心 */
   zySyncRegs(false);
 }
-/* 拉取 Supabase 注册队列并合并进本地待审核（手机端注册 → 电脑端审核的关键通道） */
+/* 拉取 Supabase 注册队列并合并进本地待审核（手机注册 → 电脑端审核，零配置自动同步） */
 window.zySyncRegs=async function(silent){
   try{
-    if(!window.ZYReg||!window.ZY) return;
-    if(!ZY.token){ if(!silent) toast('未连接云端：请先在系统设置配置云端同步','err'); return; }
-    const res=await ZYReg.listAuth();
+    if(!window.ZYReg) return;
+    const res=await ZYReg.listAll();
     if(!res.ok){ if(!silent) toast('云端注册拉取失败：'+(res.msg||''),'err'); return; }
     let added=0;
     (res.list||[]).forEach(r=>{
@@ -217,7 +216,7 @@ window.zySyncRegs=async function(silent){
       if(!d.idCard||!d.name) return;
       if(DB.users.some(u=>u.idCard===d.idCard)) return; // 已存在（含已处理）跳过
       const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
-      DB.users.push({id:'u-'+next,idCard:d.idCard,pwd:d.pwd||'123456',role:'member',org:d.org||'青年志愿者协会',name:d.name,gender:d.gender||'',birth:d.birth||'',nation:d.nation||'',politics:d.politics||'',religion:d.religion||'',school:d.school||'',dept:d.dept||'',cls:d.cls||'',grade:(window.deriveGrade?deriveGrade(d.cls):'')||'',phone:d.phone||'',email:d.email||'',qq:d.qq||'',wechat:d.wechat||'',native:d.native||'',addr:d.addr||'',title:d.title||'青年志愿者',avatar:d.avatar||'',exp:d.exp||'',position:'志愿者',activated:false,pending:true,createdAt:d.createdAt||now(),_cloudRegId:r.id});
+      DB.users.push({id:'u-'+next,idCard:d.idCard,pwd:'',role:'member',org:d.org||'青年志愿者协会',name:d.name,gender:d.gender||'',birth:d.birth||'',nation:d.nation||'',politics:d.politics||'',religion:d.religion||'',school:d.school||'',dept:d.dept||'',cls:d.cls||'',grade:(window.deriveGrade?deriveGrade(d.cls):'')||'',phone:d.phone||'',email:d.email||'',qq:d.qq||'',wechat:d.wechat||'',native:d.native||'',addr:d.addr||'',title:d.title||'青年志愿者',avatar:d.avatar||'',exp:d.exp||'',position:'志愿者',activated:false,pending:true,createdAt:d.createdAt||now(),_cloudRegId:r.id});
       added++;
     });
     if(added){ saveDB(); if(window.renderAuditPending) renderAuditPending(); if(!silent) toast('已同步 '+added+' 条云端注册','ok'); }
@@ -587,57 +586,27 @@ function renderSettings(root){
     <div class="page-block">${blockHead('专业部 / 班级 管理（自定义）','<button onclick="addDept()">+ 新增专业部</button>')}<div class="block-body" id="deptMgr"></div></div>
     <div class="page-block">${blockHead('部门 / 组织 管理（自定义）','<button onclick="addOrg()">+ 新增部门</button>')}<div class="block-body" id="orgMgr"></div></div>
     ${isSuper()?`<div class="page-block">${blockHead('管理员任命 / 换届','')}<div class="block-body"><div class="tip-line">可任命其他成员为管理员（终端管理员 / 会长 / 副会长 / 部长等），或将超级管理员权限整体移交给接班人。</div><div class="form-grid cols-3"><label>选择人员<select id="apUser">${DB.users.filter(u=>u.role!=='dev'&&u.role!=='super').map(u=>`<option value="${u.id}">${esc(u.name)}（${esc(roleLabel(u.role))}）</option>`).join('')}</select></label><label>任命为<select id="apRole2"><option value="terminal">终端管理员</option><option value="president">会长</option><option value="vice">副会长</option><option value="minister">部长/站长</option><option value="broadcaster">广播站员</option><option value="etiquette">礼仪队员</option><option value="subleague">团副总支</option></select></label><label>操作<div style="height:40px;display:flex;gap:8px;"><button class="primary" style="height:38px;flex:1;" onclick="doAppointAdmin()">任命管理员</button><button class="ghost" style="height:38px;flex:1;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;" onclick="openTransferBox()">换届移交</button></div></label></div><div id="transferBox" class="mt-12"></div></div></div>`:''}
-    <div class="page-block" id="zySyncBlock">${blockHead('云端同步（跨设备实时同步，免费，不用腾讯云）',`<button class="primary" onclick="zyTestConn()">测试连接</button><button class="ghost" onclick="zyPullNow()">立即下载云端</button><button class="ghost" onclick="zyPushNow()">立即上传本地</button>`)}<div class="block-body"><div class="tip-line" style="margin-bottom:10px;">本平台已部署在 <b>GitHub Pages 永久地址</b>。开启云端同步后，<b>手机/电脑/平板的数据实时一致</b>（手机端注册秒级出现在电脑审核中心），数据以<b>加密形式</b>存进你的 Supabase 云端（免费），即使云端数据被公开读取也无法解读。仅管理角色可配置与读取。</div><div class="form-grid cols-2"><label>Supabase 项目地址<input id="zyUrl" placeholder="https://xxxx.supabase.co" value="${esc((window.ZY&&ZY.loadCfg()||{}).url||'https://naqcaaktfqdvsanghqbm.supabase.co')}"></label><label>Supabase 匿名密钥（Publishable/Anon Key）<input id="zyKey" placeholder="sb_publishable_..." value="${esc((window.ZY&&ZY.loadCfg()||{}).key||'sb_publishable_c-JchQzWlsLLz9N_HJoO3A_dDAqc1dB')}"></label><label>云同步邮箱<input id="zyEmail" placeholder="任意邮箱（用于云端鉴权）" value="${esc((window.ZY&&ZY.loadCfg()||{}).email||'')}"></label><label>云同步密码（重要：也是数据加密密钥，务必记牢）<input id="zyPwd" type="password" placeholder="至少 8 位" value="${esc((window.ZY&&ZY.loadCfg()||{}).pwd||'')}"></label></div><div class="mt-12" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="primary" style="height:38px;padding:0 24px;" onclick="zySaveCfg()">保存并连接云端</button><span class="f12 c-3" id="zyStatus">未连接</span></div><div class="tip-line mt-12" style="font-size:12px;color:var(--ink-3);">首次使用：① 先在 Supabase 控制台 SQL Editor 执行 <b>supabase-setup.sql</b>（仓库根目录有该文件，建表一次即可）→ ② 回来填上面配置点「保存并连接云端」→ ③ 若提示需邮箱确认，去邮箱点确认后重连。所有设备填相同配置即互通。</div></div></div>
+    <div class="page-block" id="zySyncBlock">${blockHead('云端同步（全设备自动同步，零配置）',`<button class="ghost" onclick="zyPullNow()">立即下载云端</button><button class="primary" onclick="zyPushNow()">立即上传本地</button>`)}<div class="block-body"><div class="tip-line" style="margin-bottom:10px;">本平台已部署在 <b>GitHub Pages 永久地址</b>，数据自动同步到你的 Supabase 云端（免费）：<b>手机/电脑/平板所有设备、所有用户自动互通</b>，无需逐台配置；数据以加密形式存储。权限隔离由系统角色/部门规则控制（如宣传部管理员只能看到宣传部档案）。</div><div class="mt-12" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="primary" style="height:38px;padding:0 24px;" onclick="zyPullNow()">从云端拉取（覆盖本机）</button><button class="ghost" style="height:38px;padding:0 24px;" onclick="zyPushNow()">上传本机到云端（覆盖云端）</button><span class="f12 c-3" id="zyStatus">自动同步已启用</span></div><div class="tip-line mt-12" style="font-size:12px;color:var(--ink-3);">· 使用说明：登录后每 15 秒自动与云端同步一次；新增数据自动上传，云端有更新的数据自动拉取。<br>· 「上传本机到云端」用于：以本机数据为准覆盖云端（如本机刚清空演示数据）。<br>· 「从云端拉取」用于：丢弃本机数据，以云端为准。<br>· 若提示「云端数据解密失败」，点「上传本机到云端」覆盖即可（版本更新后需覆盖一次）。</div></div></div>
     <div class="page-block">${blockHead('数据维护','')}<div class="block-body"><button class="ghost" style="height:38px;padding:0 20px;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;" onclick="resetDB()">清除演示数据（危险）</button><span class="f12 c-3" style="margin-left:12px;">清除演示数据：将清空全部档案/服务/活动/任务/通知/总结/名额等数据并恢复为初始演示状态，方便录入你自己的真实数据。该操作不可恢复，请先导出 Excel 备份！</span></div></div>`;
   renderGradeMgr();renderDeptMgr();renderOrgMgr();
 }
 window.saveRules=()=>{DB.rules.scorePerPerson=parseFloat($('#setScore').value)||0.1;DB.rules.deptMultiplier=parseFloat($('#setMul').value)||0.5;saveDB();toast('评分规则已保存','ok')};
 window.saveSchool=()=>{DB.school=$('#setSchool').value;DB.schoolShort=$('#setSchoolShort').value;DB.league=$('#setLeague').value;DB.period=$('#setPeriod').value;DB.amapKey=$('#setAmap').value.trim();saveDB();toast('学校信息已保存','ok')};
 
-/* ============================== 云端同步（Supabase，不用腾讯云） ============================== */
+/* ============================== 云端同步（Supabase，零配置全设备自动同步） ============================== */
 function zySetStatus(t,ok){const el=$('#zyStatus');if(el){el.textContent=t;el.className='f12 '+(ok===true?'c-2':(ok===false?'c-red':''));}}
-window.zySaveCfg=async function(){
-  const url=$('#zyUrl').value.trim(),key=$('#zyKey').value.trim(),email=$('#zyEmail').value.trim(),pwd=$('#zyPwd').value;
-  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))return toast('请填写正确的 Supabase 项目地址（https://xxx.supabase.co）','err');
-  if(!key)return toast('请填写 Supabase 匿名密钥','err');
-  if(!email)return toast('请填写云同步邮箱','err');
-  if(pwd.length<8)return toast('云同步密码至少 8 位（务必记牢，它同时是数据加密密钥）','err');
-  ZY.saveCfg({url,key,email,pwd});
-  zySetStatus('正在连接云端…');
-  const lg=await ZY.login();
-  if(!lg.ok){
-    if(lg.code==='invalid_credentials'||/invalid/i.test(lg.code||'')){
-      zySetStatus('该邮箱尚未注册，尝试自动注册…');
-      const su=await ZY.signup();
-      if(su.ok){
-        zySetStatus('注册成功，正在登录…（若需邮箱确认请先确认）');
-        const lg2=await ZY.login();
-        if(!lg2.ok){zySetStatus('登录失败：'+lg2.msg,false);return toast('已注册，但登录失败：'+lg2.msg+'（若提示需邮箱确认，请先去邮箱点击确认链接）','err');}
-        zySetStatus('已连接云端',true);toast('云端账号已创建并连接','ok');
-      }else{zySetStatus('注册失败：'+su.msg,false);return toast('云端账号注册失败：'+su.msg,'err');}
-    }else{zySetStatus('登录失败：'+lg.msg,false);return toast('云端登录失败：'+lg.msg,'err');}
-  }else{zySetStatus('已连接云端',true);toast('云端连接成功','ok');}
-  const bt=await ZY.bootstrap();
-  if(bt.ok){ZY.startPoll();toast(bt.pulled?'已载入云端数据（本地已备份）':'本地数据已上传云端','ok');}
-  else if(bt.decryptFail)toast('云端数据解密失败：密码与上传时不一致。若确为你的密码，可先「立即上传本地」覆盖；否则导出 Excel 备份后谨慎操作','err');
-  else toast('云端同步异常：'+(bt.msg||''),'err');
-};
-window.zyTestConn=async function(){
-  if(!ZY.isCfg())return toast('请先填写配置并保存','err');
-  zySetStatus('测试中…');const lg=await ZY.login();
-  zySetStatus(lg.ok?'连接正常（已登录）':'连接失败：'+lg.msg,lg.ok);toast(lg.ok?'连接正常':'连接失败：'+lg.msg,lg.ok?'ok':'err');
-};
 window.zyPullNow=async function(){
-  if(!ZY.token)return toast('尚未连接云端','err');
+  if(!window.ZY)return toast('同步模块未加载','err');
   zySetStatus('下载中…');const p=await ZY.pull();
   if(p.ok&&p.data){const backup=window.DB;window.DB=p.data;if(window.normalizeDB)window.normalizeDB();saveDB();if(window.renderRoute)renderRoute();ZY.startPoll();zySetStatus('已下载云端数据',true);toast('已下载云端数据','ok');if(window._cloudMergeCb)window._cloudMergeCb(p.data,backup);}
-  else if(p.decryptFail)zySetStatus('解密失败：密码不一致',false),toast('解密失败：云同步密码与上传时不一致','err');
+  else if(p.empty){zySetStatus('云端暂无数据',true);toast('云端暂无数据（本机数据可点「上传本机到云端」初始化）','ok');}
+  else if(p.decryptFail)zySetStatus('解密失败：版本不匹配',false),toast('解密失败：请点「上传本机到云端」覆盖','err');
   else zySetStatus('下载失败：'+(p.msg||''),false),toast('下载失败：'+(p.msg||''),'err');
 };
 window.zyPushNow=async function(){
-  if(!ZY.token)return toast('尚未连接云端','err');
+  if(!window.ZY)return toast('同步模块未加载','err');
   zySetStatus('上传中…');const p=await ZY.push();
-  zySetStatus(p.ok?'已上传本地数据到云端':'上传失败：'+(p.msg||''),p.ok);toast(p.ok?'已上传':'上传失败：'+(p.msg||''),p.ok?'ok':'err');
+  zySetStatus(p.ok?'已上传本机数据到云端':'上传失败：'+(p.msg||''),p.ok);toast(p.ok?'已上传':'上传失败：'+(p.msg||''),p.ok?'ok':'err');
 };
 window.addGrade=()=>{const name=prompt('请输入新年级（如 26级）：');if(!name)return;if((DB.dictionaries.grades||[]).includes(name))return toast('该年级已存在','err');DB.dictionaries.grades=DB.dictionaries.grades||[];DB.dictionaries.grades.push(name);DB.dictionaries.grades.sort();saveDB();renderGradeMgr();toast('已新增','ok')};
 window.delGrade=(name)=>confirmDialog(`确认删除年级「${name}」？（已关联该年级的档案不受影响）`,()=>{DB.dictionaries.grades=(DB.dictionaries.grades||[]).filter(g=>g!==name);saveDB();renderGradeMgr();toast('已删除','ok')});
