@@ -565,10 +565,13 @@ function drawCaptcha(){
   captchaValue=captchaText();
   const box=$('#captchaBox');
   if(!box)return;
-  box.innerHTML=captchaValue.split('').map(c=>{
-    const rot=(Math.random()*40-20).toFixed(0);
-    return `<span style="display:inline-block;transform:rotate(${rot}deg);">${c}</span>`;
-  }).join('');
+  /* 稳健渲染：4 个字符独立染色 + 轻微 letter-spacing，去掉 transform 旋转（避免被部分浏览器/CSS 引擎忽略导致整行不可见） */
+  const colors=['#c8161d','#1d5fa6','#2a8a3a','#d46b08'];
+  box.innerHTML=captchaValue.split('').map((c,i)=>`<span style="color:${colors[i%4]};font-weight:900;">${c}</span>`).join('');
+  /* 兜底：若高度仍为 0，强制可见 */
+  if(box.offsetHeight<10){
+    box.style.minHeight='36px';box.style.display='inline-flex';box.style.alignItems='center';
+  }
 }
 function checkCaptcha(v){return (v||'').toUpperCase()===captchaValue.toUpperCase()}
 
