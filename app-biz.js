@@ -274,7 +274,7 @@ function renderActivities(root){
   grid.onclick=(e)=>{
     const b=e.target.closest('[data-ao]');if(!b)return;
     const id=b.dataset.a,op=b.dataset.ao;
-    if(op==='signup')actSignup(id);else if(op==='checkin')actCheckin(id);else if(op==='qr')showActQR(id);else if(op==='map')openActMap(id);else if(op==='list')viewActSignups(id);else if(op==='edit')openActivityForm(id);else if(op==='del')delActivity(id);
+    if(op==='signup')actSignup(id);else if(op==='checkin')actCheckin(id);else if(op==='qr')showActQR(id);else if(op==='map')openActMap(id);else if(op==='signinmgr')openActSignin(id);else if(op==='list')viewActSignups(id);else if(op==='edit')openActivityForm(id);else if(op==='del')delActivity(id);
   };
   $('#acKw').onkeydown=e=>{if(e.key==='Enter')actSearch()};
 }
@@ -284,7 +284,7 @@ function actCardHtml(a){
   const sgWin=(sg.start&&sg.end)?sg.start.slice(5,16)+'~'+sg.end.slice(5,16):(sg.start||sg.end||'-');
   const isOpen=a.status==='open';
   const btn=(op,label,cls)=>`<button ${cls?'class="'+cls+'"':''} data-a="${a.id}" data-ao="${op}">${label}</button>`;
-  const ops=`${isOpen?btn('signup','我要报名','fill'):''}${inSignin?btn('checkin','活动签到','ok'):''}${btn('qr','二维码')}${btn('map','地图导航')}${canEdit()?btn('list','名单')+btn('edit','编辑')+`<button class="warn" data-a="${a.id}" data-ao="del">删除</button>`:''}`;
+  const ops=`${isOpen?btn('signup','我要报名','fill'):''}${inSignin?btn('checkin','活动签到','ok'):''}${btn('qr','二维码')}${btn('map','地图导航')}${canEdit()?btn('signinmgr','签到管理','ok')+btn('list','报名名单')+btn('edit','编辑')+`<button class="warn" data-a="${a.id}" data-ao="del">删除</button>`:''}`;
   return `<div class="act-card"><div class="top"><div class="ti">${esc(a.title)}</div><span class="tag ${isOpen?'ok':'gray'}">${isOpen?'招募中':'已结束'}</span></div><div class="act-cover">${(a.covers&&a.covers[0]&&a.covers[0].dataUrl)?`<img src="${a.covers[0].dataUrl}">`:'<div class="cover-empty">暂无活动图</div>'}</div><div class="meta"><span>时间 ${esc(a.startDT)}</span><span>地点 ${esc(a.location)}</span><span>主办 ${esc(a.organizer)}</span></div><div class="desc">${esc(a.intro||'')}</div><div class="meta"><span>已报名 ${(a.signups||[]).length}/${a.need||0}</span><span>签到 ${esc(sgWin)}</span></div><div class="ops">${ops}</div></div>`;
 }
 window.actSearch=()=>{_actFilter.kw=$('#acKw').value.trim();_actFilter.st=$('#acSt').value;renderActivities($('#viewRoot'))};
@@ -316,6 +316,82 @@ window.openActivityForm=function(existing){
   };
 };
 window.delActivity=(id)=>confirmDialog('确认删除该活动？',()=>{DB.activities=DB.activities.filter(a=>a.id!==id);saveDB();renderActivities($('#viewRoot'));toast('已删除','ok')});
+
+/* ============================== 活动签到：自动同步到服务记录 ============================== */
+function syncServiceFromSignin(act,signup){
+  /* 签到后 → 自动写入服务记录。
+     规则：若参与人已在 DB.users 中（有档案），自动补齐 dept/cls/org；
+          若系统没有该参与人档案，仅记 name+idCard（待管理员去「服务与加分」手动补 dept/cls） */
+  const u=DB.users.find(x=>x.idCard===signup.idCard);
+  const dur=durationHours(act.startDT,act.endDT);
+  const has=u?!!(u.dept||u.cls):false;
+  DB.services=DB.services||[];
+  const dup=DB.services.find(s=>s.activity===act.title && s.idCard===signup.idCard);
+  if(dup){toast('该参与人已有服务记录，未重复添加','err');return;}
+  DB.services.unshift({
+    id:uid('s'),
+    name:signup.name, idCard:signup.idCard,
+    dept:u?u.dept:'', cls:u?u.cls:'', org:act.organizer||(u?u.org:''),
+    activity:act.title, startDT:act.startDT, endDT:act.endDT, duration:dur,
+    location:act.location, serviceBy:currentUser.name, signinAt:now(), sourceAct:act.id,
+    incomplete:!has
+  });
+}
+function inSigninWindow(act){
+  if(!act.signin)return false;
+  const nowD=new Date().getTime();
+  const sD=act.signin.start?new Date(act.signin.start).getTime():0;
+  const eD=act.signin.end?new Date(act.signin.end).getTime():0;
+  if(sD&&nowD<sD)return false;
+  if(eD&&nowD>eD)return false;
+  return true;
+}
+window.actCheckin=function(id){
+  const a=DB.activities.find(x=>x.id===id);if(!a)return;
+  if(!inSigninWindow(a))return toast('当前不在签到时间窗内','err');
+  if(!currentUser.idCard)return toast('您的账号缺少身份证号，请到「我的档案」补录','err');
+  if((a.signups||[]).some(s=>s.idCard===currentUser.idCard)){
+    /* 已经报名过的活动可签到 */
+  }else{
+    /* 未报名也可临时签到（常见于没提前报名的志愿者） */
+    a.signups=a.signups||[];a.signups.push({name:currentUser.name,idCard:currentUser.idCard,cls:currentUser.cls||'',dept:currentUser.dept||'',phone:currentUser.phone||'',time:now()});
+  }
+  DB.signinRecs=DB.signinRecs||[];
+  if(DB.signinRecs.find(r=>r.actId===id&&r.idCard===currentUser.idCard))return toast('您已签到','err');
+  const me=a.signups.find(s=>s.idCard===currentUser.idCard);
+  DB.signinRecs.push({id:uid('sn'),actId:id,name:me.name,idCard:me.idCard,signinAt:now(),by:currentUser.name});
+  syncServiceFromSignin(a,me);
+  saveDB();pushLog('活动签到',`签到「${a.title}」`);
+  toast('签到成功，已自动同步到服务记录','ok');
+  renderActivities($('#viewRoot'));
+};
+window.openActSignin=function(id){
+  const a=DB.activities.find(x=>x.id===id);if(!a)return;
+  const signups=a.signups||[];const signed=(DB.signinRecs||[]).filter(r=>r.actId===id);
+  const win=inSigninWindow(a);
+  openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>签到管理 · ${esc(a.title)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
+    <div class="tip-line">活动时间 ${esc(a.startDT)} ~ ${esc(a.endDT)}<br>签到时间窗：${esc(a.signin?.start||'-')} ~ ${esc(a.signin?.end||'-')}（${win?'<b style="color:#2a8a3a">当前在签到窗内</b>':'<b style="color:#a30e16">当前不在签到窗内</b>'}）<br>已签到 <b>${signed.length}</b> / ${signups.length} 人 · 签到后系统自动把该参与人信息同步到「服务与加分」服务记录</div>
+    <table class="tbl mt-12"><thead><tr><th style="width:40px">#</th><th>姓名</th><th>身份证号</th><th>专业部/班级</th><th>报名时间</th><th>签到状态</th><th style="width:120px">操作</th></tr></thead><tbody>
+    ${signups.length?signups.map((s,i)=>{
+      const sg=signed.find(r=>r.idCard===s.idCard);
+      const u=DB.users.find(x=>x.idCard===s.idCard);
+      return `<tr><td class="ctr">${i+1}</td><td><b>${esc(s.name)}</b></td><td>${esc((s.idCard||'').slice(0,6))}****${esc((s.idCard||'').slice(-4))}</td><td>${esc(s.dept||u?.dept||'-')} / ${esc(s.cls||u?.cls||'-')}</td><td>${esc((s.time||'').slice(0,16))}</td><td>${sg?'<span class="tag ok">已签到 '+esc((sg.signinAt||'').slice(11,16))+'</span>':'<span class="tag warn">未签到</span>'}</td><td>${sg?'<span class="f12 c-3">已自动同步服务</span>':(!win?'<span class="f12 c-3">签到窗未到</span>':`<button class="primary" style="height:26px;padding:0 10px;" onclick="actCheckinFor('${a.id}',${i})">代签</button>`)}</td></tr>`;
+    }).join(''):'<tr><td colspan="7" class="empty-tip">暂无报名人员</td></tr>'}
+    </tbody></table>
+    <div class="tip-line mt-12">若参与人在系统内有档案（DB.users），签到后自动带齐专业部/班级/部门写入服务记录；<br>若<b>未建档</b>，服务记录只记姓名+身份证号，专业部/班级为空待管理员在「服务与加分」手动补录。</div>
+  </div><div class="modal-foot"><button class="ghost" data-close-modal>关闭</button></div></div>`);
+};
+window.actCheckinFor=function(actId,idx){
+  const a=DB.activities.find(x=>x.id===actId);if(!a)return;
+  if(!inSigninWindow(a))return toast('当前不在签到时间窗内','err');
+  const s=(a.signups||[])[idx];if(!s)return;
+  DB.signinRecs=DB.signinRecs||[];
+  if(DB.signinRecs.find(r=>r.actId===actId&&r.idCard===s.idCard))return toast('该参与人已签到','err');
+  DB.signinRecs.push({id:uid('sn'),actId,name:s.name,idCard:s.idCard,signinAt:now(),by:currentUser.name});
+  syncServiceFromSignin(a,s);
+  saveDB();pushLog('活动签到',`代签「${a.title}」/ ${s.name}`);pushTrace('代签','活动: '+a.title+' / '+s.name,{signed:false},{signed:true});
+  openActSignin(actId);toast(`已代签 ${s.name}，服务记录已同步`,'ok');
+};
 window.actSignup=(id)=>{
   const a=DB.activities.find(x=>x.id===id);if(!a)return;
   openModal(`<div class="modal" style="width:440px;"><div class="modal-title"><span class="bar"></span>活动报名 · ${esc(a.title)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid">
@@ -631,15 +707,34 @@ window.doAppointAdmin=()=>{
   confirmDialog(`确认将 <b>${esc(u.name)}</b> 任命为「${rl}」？`,()=>{u.role=role;u.activated=true;u.pending=false;u.status='正常在岗';u.title=rl;u.position=rl;saveDB();pushLog('任命管理员',`任命 ${u.name} 为 ${rl}`);renderSettings($('#viewRoot'));toast('任命成功','ok')},'任命管理员');
 };
 window.openTransferBox=function(){const box=$('#transferBox');if(!box)return;box.innerHTML=`<div class="tip-line">将超级管理员权限移交给接班人，原管理员自动降级。</div><div class="form-grid cols-2"><label>选择接班人<select id="trTo">${DB.users.filter(u=>u.id!==currentUser.id&&u.role!=='dev').map(u=>`<option value="${u.id}">${esc(u.name)}（${esc(u.dept||'-')} ${esc(u.cls||'-')}）</option>`).join('')}</select></label><label>原管理员降级为<select id="trFromRole"><option>member</option><option>president</option><option>vice</option><option>minister</option></select></label></div><button class="primary mt-12" style="height:38px;padding:0 24px;" onclick="doTransfer()">确认换届移交</button>`};
-window.addDept=()=>{const name=prompt('请输入新专业部名称：');if(!name)return;if(DB.dictionaries.departments.includes(name))return toast('该专业部已存在','err');DB.dictionaries.departments.push(name);DB.dictionaries.classes[name]=[];saveDB();renderDeptMgr();toast('已新增','ok')};
-window.delDept=(name)=>confirmDialog(`确认删除专业部「${name}」？`,()=>{DB.dictionaries.departments=DB.dictionaries.departments.filter(d=>d!==name);delete DB.dictionaries.classes[name];saveDB();renderDeptMgr();toast('已删除','ok')});
-window.addClass=(dept)=>{const name=prompt(`为「${dept}」新增班级（如 26级XX班）：`);if(!name)return;DB.dictionaries.classes[dept]=DB.dictionaries.classes[dept]||[];if(!DB.dictionaries.classes[dept].includes(name))DB.dictionaries.classes[dept].push(name);saveDB();renderDeptMgr();toast('已新增','ok')};
-window.delClass=(dept,name)=>confirmDialog(`确认删除班级「${name}」？`,()=>{DB.dictionaries.classes[dept]=(DB.dictionaries.classes[dept]||[]).filter(c=>c!==name);saveDB();renderDeptMgr();toast('已删除','ok')});
-window.addOrg=()=>{const name=prompt('请输入新部门/组织名称：');if(!name)return;if(DB.dictionaries.organizations.includes(name))return toast('该部门已存在','err');DB.dictionaries.organizations.push(name);saveDB();renderOrgMgr();toast('已新增','ok')};
-window.delOrg=(name)=>confirmDialog(`确认删除部门「${name}」？`,()=>{DB.dictionaries.organizations=DB.dictionaries.organizations.filter(o=>o!==name);saveDB();renderOrgMgr();toast('已删除','ok')});
+window.addDept=()=>{const name=prompt('请输入新专业部名称：');if(!name)return;if(DB.dictionaries.departments.includes(name))return toast('该专业部已存在','err');DB.dictionaries.departments.push(name);DB.dictionaries.classes[name]=[];saveDB();if(window.ZY)ZY.push();renderDeptMgr();toast('已新增','ok')};
+window.delDept=(name)=>confirmDialog(`确认删除专业部「${name}」？`,()=>{DB.dictionaries.departments=DB.dictionaries.departments.filter(d=>d!==name);delete DB.dictionaries.classes[name];saveDB();if(window.ZY)ZY.push();renderDeptMgr();toast('已删除','ok')});
+window.addClass=(dept)=>{const name=prompt(`为「${dept}」新增班级（如 26级XX班）：`);if(!name)return;DB.dictionaries.classes[dept]=DB.dictionaries.classes[dept]||[];if(!DB.dictionaries.classes[dept].includes(name))DB.dictionaries.classes[dept].push(name);saveDB();if(window.ZY)ZY.push();renderDeptMgr();toast('已新增','ok')};
+window.delClass=(dept,name)=>confirmDialog(`确认删除班级「${name}」？`,()=>{DB.dictionaries.classes[dept]=(DB.dictionaries.classes[dept]||[]).filter(c=>c!==name);saveDB();if(window.ZY)ZY.push();renderDeptMgr();toast('已删除','ok')});
+/* 批量添加班级：一行一个，一次可贴 100+ 个班级（适合 300-500 班的大校） */
+window.addClassBatch=(dept)=>{
+  openModal(`<div class="modal"><div class="modal-title"><span class="bar"></span>为「${esc(dept)}」批量添加班级<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
+    <div class="tip-line">一个班级一行，例如：<br>· <b>24级会计1班</b><br>· <b>24级会计2班</b><br>· <b>25级会计1班</b></div>
+    <label>班级名称（每行一个，支持直接粘贴 Excel 单元格）<textarea id="batchCls" style="min-height:260px;" placeholder="24级会计1班\n24级会计2班\n25级会计1班\n..."></textarea></label>
+    <div class="f12 c-3 mt-8">自动去重 · 自动跳过已存在 · 不限制数量</div>
+  </div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" onclick="doAddClassBatch('${esc(dept)}')">一键添加</button></div></div>`);
+};
+window.doAddClassBatch=(dept)=>{
+  const txt=$('#batchCls').value||'';
+  const list=txt.split(/[\n\r,;，；\t]+/).map(s=>s.trim()).filter(Boolean);
+  if(!list.length)return toast('请输入至少一个班级名','err');
+  const exist=DB.dictionaries.classes[dept]||[];
+  const before=exist.length;
+  list.forEach(n=>{if(!exist.includes(n))exist.push(n);});
+  DB.dictionaries.classes[dept]=exist;
+  saveDB();if(window.ZY)ZY.push();closeModal();renderDeptMgr();
+  toast(`已新增 ${exist.length-before} 个班级（重复 ${list.length-(exist.length-before)} 个）`,'ok');
+};
+window.addOrg=()=>{const name=prompt('请输入新部门/组织名称：');if(!name)return;if(DB.dictionaries.organizations.includes(name))return toast('该部门已存在','err');DB.dictionaries.organizations.push(name);saveDB();if(window.ZY)ZY.push();renderOrgMgr();toast('已新增','ok')};
+window.delOrg=(name)=>confirmDialog(`确认删除部门「${name}」？`,()=>{DB.dictionaries.organizations=DB.dictionaries.organizations.filter(o=>o!==name);saveDB();if(window.ZY)ZY.push();renderOrgMgr();toast('已删除','ok')});
 function renderDeptMgr(){
   const box=$('#deptMgr');if(!box)return;
-  box.innerHTML=DB.dictionaries.departments.map(d=>{const cls=DB.dictionaries.classes[d]||[];return`<div style="padding:12px;margin-bottom:10px;background:#fafafa;border-radius:2px;"><div style="display:flex;justify-content:space-between;align-items:center;"><b>${esc(d)}</b><span style="display:flex;gap:6px;"><button class="ghost" style="height:26px;padding:0 10px;" onclick="addClass('${esc(d)}')">+ 班级</button><button class="ghost" style="height:26px;padding:0 10px;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;" onclick="delDept('${esc(d)}')">删除</button></span></div><div class="mt-8">${cls.length?cls.map(c=>`<span class="chip">${esc(c)} <a onclick="delClass('${esc(d)}','${esc(c)}')">×</a></span>`).join(''):'<span class="f12 c-3">暂无班级，点击「+ 班级」添加</span>'}</div></div>`}).join('');
+  box.innerHTML=DB.dictionaries.departments.map(d=>{const cls=DB.dictionaries.classes[d]||[];return`<div style="padding:12px;margin-bottom:10px;background:#fafafa;border-radius:2px;"><div style="display:flex;justify-content:space-between;align-items:center;"><b>${esc(d)}</b><span style="display:flex;gap:6px;"><button class="ghost" style="height:26px;padding:0 10px;" onclick="addClass('${esc(d)}')">+ 班级</button><button class="primary" style="height:26px;padding:0 10px;" onclick="addClassBatch('${esc(d)}')">+ 批量班级</button><button class="ghost" style="height:26px;padding:0 10px;color:var(--red);box-shadow:0 0 0 1px var(--red) inset;" onclick="delDept('${esc(d)}')">删除</button></span></div><div class="mt-8">${cls.length?cls.map(c=>`<span class="chip">${esc(c)} <a onclick="delClass('${esc(d)}','${esc(c)}')">×</a></span>`).join(''):'<span class="f12 c-3">暂无班级，点击「+ 班级」或「+ 批量班级」添加（粘贴每行一个）</span>'}</div></div>`}).join('');
 }
 function renderOrgMgr(){const box=$('#orgMgr');if(!box)return;box.innerHTML=DB.dictionaries.organizations.map(o=>`<span class="chip">${esc(o)} <a onclick="delOrg('${esc(o)}')">×</a></span>`).join('')}
 window.doTransfer=()=>{
