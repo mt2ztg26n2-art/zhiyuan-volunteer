@@ -104,20 +104,21 @@ function normalizeDB(db){
     (seedDB().users||[]).forEach(su=>{ if(SYSTEM_IDS.includes(su.id) && !db.users.some(u=>u.idCard===su.idCard)) db.users.push(su); });
     db._seedV=3;
   }
-  // 兜底：移除非系统账号的残留用户（无 _regVia 标记的"脏数据"），保持纯净
-  /* 【v19.5 关键修复】原代码 filter 条件为 OR：SYSTEM_IDS || (pwd && idCard && name)
-   * —— 演示账号 u-prez/u-vice/u-min/... 都有 pwd+idCard+name，OR 后半段把它们全部保留！
-   * 注释说"移除演示用户"但代码从未实现，导致点"清除演示数据"后 normalizeDB 又把
-   * 演示数据全加回来，污染永远清不干净。改为按"来源标记"白名单：
+  /* 兜底过滤（v19.19）：演示账号只在"恢复演示数据"模式（_demoMode=true）下保留，
+   * 其它时候一律清除——彻底解决"设备残留的演示账号又被带回来"。
+   * 规则：
    *   - 3 系统账号（SYSTEM_IDS）始终保留
    *   - _regVia='register' 的真实注册用户保留（按部门待审/在岗都保留）
-   *   - _regVia='demo' 的演示账号保留（"恢复演示数据"按钮能持续生效）
-   *   - 其他无标记的"残留脏数据"全部清除（含旧版本 buildDemoData 未标记数据） */
+   *   - _regVia='demo' 的演示账号：仅 _demoMode=true（点过「恢复演示数据」）时保留
+   *   - 无标记用户 = 管理员「录入档案」的真实成员，保留（v19.5 曾把无标记全删，
+   *     会导致录入的成员刷新后消失——用户已有真实数据，绝不能误删） */
   db.users=(db.users||[]).filter(u=>{
     if(SYSTEM_IDS.includes(u.id)) return true;
-    if(u._regVia==='register' || u._regVia==='demo') return true;
-    return false;
+    if(u._regVia==='register') return true;
+    if(u._regVia==='demo') return !!db._demoMode;
+    return true;
   });
+  if(!db._demoMode) delete db._demoMode;   // 非演示模式下不保留该标记（避免同步影响其它设备）
   (db.users||[]).forEach(u=>{
     if(!u.grade) u.grade=deriveGrade(u.cls||'');
     if(!u.totpSecret) u.totpSecret=genSecret();
@@ -150,6 +151,7 @@ async function resetDB(){
     }
   }catch(e){}
   DB.users=(DB.users||[]).filter(u=>sysIds.includes(u.id));
+  DB._demoMode=false;   /* v19.19：重置后退出演示模式 */
   bizKeys.forEach(k=>{ DB[k]=[]; });
   saveDB();
   try{

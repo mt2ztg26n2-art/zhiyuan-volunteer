@@ -13,7 +13,7 @@
      2) 旧版拼接 URL 用 location.href.split('?')[0]+'&v='：已有 ?v= 时变成 .../&v=19.7 → 404 -->
 <script>
 (function(){
-  var V='19.18';
+  var V='19.19';
   var cur=(location.href.match(/[?&]v=([0-9.]+)/)||[])[1]||'';
   /* 版本逐段数字比较：19.10 > 19.9 > 19.7 */
   function cmp(a,b){
@@ -27,7 +27,7 @@
   }
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=19.18">
+<link rel="stylesheet" href="styles.css?v=19.19">
 </head>
 <body>
 
@@ -230,9 +230,9 @@
 <script defer src="vendor/jspdf.umd.min.js"></script>
 <script defer src="vendor/jspdf.plugin.autotable.min.js"></script>
 <script defer src="vendor/qrcode-gen.js"></script>
-<script defer src="app.js?v=19.18"></script>
-<script defer src="app-biz.js?v=19.18"></script>
-<script defer src="zy-sync.js?v=19.18"></script>
-<script defer src="demo-data.js?v=19.18"></script>
+<script defer src="app.js?v=19.19"></script>
+<script defer src="app-biz.js?v=19.19"></script>
+<script defer src="zy-sync.js?v=19.19"></script>
+<script defer src="demo-data.js?v=19.19"></script>
 </body>
 </html>

@@ -467,7 +467,7 @@ window.exportActivities=function(){const rows=DB.activities.map(a=>({'活动':a.
 
 /* ============================== 分享二维码（v19.17：扫码直接打开网页报名，可分享） ============================== */
 /* 生成可分享深链：扫码 → 打开平台对应活动/任务页（版本守卫保留 hash） */
-function zyShareUrl(kind,id){ return location.origin + location.pathname + '?v=19.18#' + kind + '/' + id; }
+function zyShareUrl(kind,id){ return location.origin + location.pathname + '?v=19.19#' + kind + '/' + id; }
 window.copyShareLink=function(url){
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(()=>toast('链接已复制，快去分享吧','ok')).catch(()=>toast('复制失败，请长按链接手动复制','err'));
@@ -1472,6 +1472,7 @@ window.quotaReject=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)retur
 window.restoreDemo=function(){
   if(!confirm('确认恢复演示数据？将覆盖当前所有数据为演示状态（含示例档案/活动/服务/通知等），之后可随时点「清除所有演示数据」回到纯净。建议先导出 Excel 备份！')) return;
   if(!window.buildDemoData){ toast('演示数据模块未加载，请强刷页面','err'); return; }
+  DB._demoMode=true;   /* v19.19：进入演示模式，normalizeDB 才会保留演示账号；清除后自动退出 */
   DB=normalizeDB(buildDemoData());
   /* v19.14：解除与演示数据相关的墓碑——先本地 untomb，再 untombPush 移除云端墓碑，
      否则刚「清除」过的记录会被墓碑过滤掉，恢复不回来。 */
@@ -1511,6 +1512,7 @@ window.clearAllDemo=async function(){
     }
   }catch(e){}
   DB.users=(DB.users||[]).filter(u=>sysIds.includes(u.id));
+  DB._demoMode=false;   /* v19.19：清除后退出演示模式，演示账号不再保留 */
   bizKeys.forEach(k=>{ DB[k]=[]; });
   DB.nextIds={user:100,service:10,activity:10,task:10,news:10,notify:10,summary:10,report:10};
   saveDB();
