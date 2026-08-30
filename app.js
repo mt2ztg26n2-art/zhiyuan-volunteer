@@ -530,7 +530,7 @@ function openRegister(){
     <label>宗教信仰<select id="rReligion">${(DB.dictionaries.religion||[]).map(n=>`<option>${n}</option>`).join('')}</select></label>
     <label>所在学校<input id="rSchool" value="${esc(DB.school)}"></label>
     <label>专业部<select id="rDept"><option value="">请选择</option>${(DB.dictionaries.departments||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="rCls"><option value="">请选择</option></select></label>
+    <label>班级<input id="rCls" placeholder="如：24级会计1班（直接输入）"></label>
     <label>所在部门<select id="rOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
     <label>职位/类型<select id="rType"><option>青年志愿者</option><option>广播站成员</option><option>礼仪队成员</option><option>团总支成员</option></select></label>
     <label>登录密码<i>*</i><input id="rPwd" type="password"></label>
@@ -543,7 +543,6 @@ function openRegister(){
     <label>居住地址<input id="rAddr"></label>
     <label>证件照（白底二寸）<input id="rPhoto" type="file" accept="image/*"></label>
     <label>个人简历/经历<textarea id="rExp"></textarea></label>`;
-  $('#rDept').onchange=()=>{const list=(DB.dictionaries.classes[$('#rDept').value]||[]);$('#rCls').innerHTML='<option value="">请选择</option>'+list.map(c=>`<option>${c}</option>`).join('')};
   $('#registerModal').hidden=false;
 }
 
@@ -943,7 +942,7 @@ window.openUserForm=function(existing){
     <label>政治面貌<select id="ufPolitics">${(DB.dictionaries.politics||[]).map(n=>`<option ${u?.politics===n?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>宗教信仰<select id="ufReligion">${(DB.dictionaries.religion||[]).map(n=>`<option ${u?.religion===n?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>专业部<select id="ufDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${u?.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="ufCls"><option value="">-</option></select></label>
+    <label>班级<input id="ufCls" value="${esc(u?.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
     <label>所在部门<i>*</i><select id="ufOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option ${(u?.org||initOrg)===d?'selected':''}>${d}</option>`).join('')}</select></label>
     <label>职位 / 类型<i>*</i><select id="ufTitle" data-datalist="ufTitleList"></select><datalist id="ufTitleList"></datalist></label>
     <label>邮箱<input id="ufEmail" value="${esc(u?.email||'')}"></label>
@@ -961,8 +960,7 @@ window.openUserForm=function(existing){
     <div class="full" id="ufExtra"></div>
     <label class="full">兴趣爱好 / 特长<textarea id="ufHobby">${esc(u?.hobby||'')}</textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="ufSave">${isEdit?'保存修改':'提交录入'}</button></div></div>`);
-  const setCls=()=>{const list=(DB.dictionaries.classes[$('#ufDept').value]||[]);$('#ufCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${u?.cls===c?'selected':''}>${c}</option>`).join('')};
-  setCls();$('#ufDept').onchange=setCls;$('#ufStatus').value=u?.status||'正常在岗';
+  $('#ufStatus').value=u?.status||'正常在岗';
   /* 部门 ↔ 职位 联动：切换部门时刷新职位 datalist；编辑时按所在部门预填当前职位 */
   const initTitle=u?.title||'';
   const refTitle=()=>{

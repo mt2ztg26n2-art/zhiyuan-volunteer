@@ -396,11 +396,9 @@ window.actSignup=(id)=>{
     <label>姓名<i>*</i><input id="sgName" value="${esc(currentUser.name)}"></label>
     <label>身份证号<i>*</i><input id="sgId" value="${esc(currentUser.idCard)}" maxlength="18"></label>
     <label>专业部<select id="sgDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="sgCls"><option value="">-</option></select></label>
+    <label>班级<input id="sgCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
     <label class="full">联系电话<input id="sgPhone" value="${esc(currentUser.phone||'')}"></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="sgSubmit">提交报名</button></div></div>`);
-  const setCls=()=>{const list=(DB.dictionaries.classes[$('#sgDept').value]||[]);$('#sgCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${currentUser.cls===c?'selected':''}>${c}</option>`).join('')};
-  setCls();$('#sgDept').onchange=setCls;
   $('#sgSubmit').onclick=()=>{
     const name=$('#sgName').value.trim(),idCard=$('#sgId').value.trim();
     if(!name||!isIDCard(idCard))return toast('请填写正确的姓名和身份证号','err');
@@ -419,11 +417,9 @@ window.actCheckin=(id)=>{
     <label>姓名<i>*</i><input id="ckName" value="${esc(currentUser.name)}"></label>
     <label>身份证号<i>*</i><input id="ckId" value="${esc(currentUser.idCard)}" maxlength="18"></label>
     <label>专业部<select id="ckDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="ckCls"><option value="">-</option></select></label>
+    <label>班级<input id="ckCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
     <label class="full">签到位置<input id="ckLoc" placeholder="如：校体育馆"></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="ckSubmit">确认签到</button></div></div>`);
-  const setCls=()=>{const list=(DB.dictionaries.classes[$('#ckDept').value]||[]);$('#ckCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${currentUser.cls===c?'selected':''}>${c}</option>`).join('')};
-  setCls();$('#ckDept').onchange=setCls;
   $('#ckSubmit').onclick=()=>{
     const name=$('#ckName').value.trim(),idCard=$('#ckId').value.trim();
     if(!name||!isIDCard(idCard))return toast('请填写正确的姓名和身份证号','err');
@@ -484,12 +480,10 @@ window.taskSignup=(id)=>{
   openModal(`<div class="modal" style="width:440px;"><div class="modal-title"><span class="bar"></span>任务报名 · ${esc(t.title)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid">
     <label>姓名<i>*</i><input id="tkName" value="${esc(currentUser.name)}"></label>
     <label>专业部<select id="tkDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="tkCls"><option value="">-</option></select></label>
+    <label>班级<input id="tkCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
     <label>联系电话<input id="tkPhone" value="${esc(currentUser.phone||'')}"></label>
     <label class="full">报名说明<textarea id="tkNote"></textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="tkSubmit">提交报名</button></div></div>`);
-  const setCls=()=>{const list=(DB.dictionaries.classes[$('#tkDept').value]||[]);$('#tkCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${currentUser.cls===c?'selected':''}>${c}</option>`).join('')};
-  setCls();$('#tkDept').onchange=setCls;
   $('#tkSubmit').onclick=()=>{
     const name=$('#tkName').value.trim();if(!name)return toast('请填写姓名','err');
     t.signups=t.signups||[];
@@ -511,11 +505,9 @@ window.taskCheckin=(id)=>{
     <label>姓名<i>*</i><input id="tkCkName" value="${esc(currentUser.name)}"></label>
     <label>身份证号<i>*</i><input id="tkCkId" value="${esc(currentUser.idCard)}" maxlength="18"></label>
     <label>专业部<select id="tkCkDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="tkCkCls"><option value="">-</option></select></label>
+    <label>班级<input id="tkCkCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
     <label class="full">签到位置<input id="tkCkLoc" placeholder="如：校团委办公室"></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="tkCkSubmit">确认签到</button></div></div>`);
-  const setCls=()=>{const list=(DB.dictionaries.classes[$('#tkCkDept').value]||[]);$('#tkCkCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${currentUser.cls===c?'selected':''}>${c}</option>`).join('')};
-  setCls();$('#tkCkDept').onchange=setCls;
   $('#tkCkSubmit').onclick=()=>{
     const name=$('#tkCkName').value.trim(),idCard=$('#tkCkId').value.trim();
     if(!name||!isIDCard(idCard))return toast('请填写正确的姓名和身份证号','err');
@@ -1386,11 +1378,9 @@ window.openQuotaForm=function(){
     <label>申请类型<select id="qKind">${isMember?'<option>个人自荐</option>':'<option>组织推荐</option><option>个人自荐</option><option>团支部推优</option>'}</select></label>
     <label>推荐人选<input id="qName" placeholder="被推荐人姓名"></label>
     <label>专业部<select id="qDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
-    <label>班级<select id="qCls"><option value="">-</option></select></label>
+    <label>班级<input id="qCls" placeholder="如：24级会计1班（直接输入）"></label>
     <label class="full">推荐 / 申请事由<textarea id="qReason" placeholder="说明该人选的志愿服务表现与推优理由"></textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="qSave">提交</button></div></div>`);
-  const setCls=()=>{const l=(DB.dictionaries.classes[$('#qDept').value]||[]);$('#qCls').innerHTML='<option value="">-</option>'+l.map(c=>`<option>${c}</option>`).join('')};
-  setCls();$('#qDept').onchange=setCls;
   $('#qSave').onclick=()=>{const name=$('#qName').value.trim();if(!name)return toast('请填写推荐人选','err');const o={id:uid('q'),name,dept:$('#qDept').value,cls:$('#qCls').value,kind:$('#qKind').value,reason:$('#qReason').value.trim(),status:'recommend',createdAt:now(),trace:[{act:'提交推荐',st:'recommend',time:now(),by:currentUser.name}]};
     DB.quotas.unshift(o);saveDB();pushNotify({to:'超级管理员',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushNotify({to:'终端管理员',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushNotify({to:'会 长',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushLog('团员名额','提交 '+name+' 的名额推荐');closeModal();if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已提交，进入审核中心待办','ok')};
 };
