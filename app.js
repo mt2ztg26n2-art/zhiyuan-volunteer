@@ -66,7 +66,7 @@ function seedDB(){
         '机建':['24级机电1班','24级机电2班','24级机电3班','25级机电1班','25级机电2班'],
         '现代服务':['24级幼保1班','24级幼保2班','25级养护1班','25级养护2班','25级养护3班','25级养护4班']
       },
-      organizations:['青年志愿者协会','团总支','学生会','广播站','礼仪队','团副总支'],
+      organizations:['团委办公室','青年志愿者协会','广播站','礼仪队','团副总支','团总支','学生会','专业团支部'],
       grades:['23级','24级','25级']
     },
     rules:{ scorePerPerson:0.1, deptMultiplier:0.5 },
@@ -114,6 +114,18 @@ function normalizeDB(db){
   if(!db.evaluations) db.evaluations=[];
   if(!db.quotas) db.quotas=[];
   if(!db.nextIds) db.nextIds={};
+  // 字典增量合并：保留用户已有数据，向 organizations/positions/classes 追加新条目（不覆盖）
+  const seed=seedDB();
+  const orgs=new Set([...(db.dictionaries.organizations||[]),...(seed.dictionaries.organizations||[])]);
+  db.dictionaries.organizations=[...orgs];
+  if(db.dictionaries.classes){
+    Object.keys(seed.dictionaries.classes||{}).forEach(dept=>{
+      const exist=new Set(db.dictionaries.classes[dept]||[]);
+      const inc=new Set(seed.dictionaries.classes[dept]||[]);
+      inc.forEach(c=>exist.add(c));
+      db.dictionaries.classes[dept]=[...exist];
+    });
+  }
   // 一次性合并种子账号（v13 新增广播站/礼仪队/团副总支成员等），按身份证去重；带版本标记避免已删档案复活
   if(!db._seedV){
     (seedDB().users||[]).forEach(su=>{ if(!db.users.some(u=>u.idCard===su.idCard)) db.users.push(su); });
@@ -556,12 +568,25 @@ function doForgot(){
 
 function doLogout(){localStorage.removeItem(LS_USR);toast('已退出登录','ok');location.reload()}
 function pushLog(action,content){DB.logs.unshift({id:uid('l'),time:now(),user:currentUser?currentUser.name:'-',role:currentUser?currentUser.role:'-',action,content});if(DB.logs.length>1000)DB.logs.length=1000;saveDB()}
-function pushNotify(o){DB.notifies.unshift(Object.assign({id:uid('nt'),time:now(),unread:true},o));saveDB();updateNotifyBadge()}
+function pushNotify(o){DB.notifies.unshift(Object.assign({id:uid('nt'),time:now(),unread:true,pending:true},o));saveDB();updateNotifyBadge()}
 
+function badgeText(n){
+  if(!n) return '';
+  if(n<=9) return String(n);
+  if(n<=99) return '9+';
+  return '99+';
+}
+function notifyKindLabel(k){
+  return ({audit:'待审核',act:'活动',task:'任务',news:'新闻',sys:'系统',quota:'名额',summary:'总结',reg:'注册'}[k]||'通知');
+}
 function updateNotifyBadge(){
   if(!currentUser)return;
   const unread=DB.notifies.filter(n=>n.unread===true&&(n.to==='all'||n.to===currentUser.name||n.to===roleLabel(currentUser.role))).length;
-  const b=$('#tbMsgBadge');if(b){b.textContent=unread;b.style.display=unread?'inline-block':'none'}
+  const b=$('#tbMsgBadge');if(b){
+    b.textContent=badgeText(unread);
+    b.style.display=unread?'inline-flex':'none';
+    b.title=unread>9?`${unread} 条未读`:'';
+  }
 }
 function renderNotifyList(tab){
   const box=$('#notifyList');if(!box)return;
@@ -569,12 +594,33 @@ function renderNotifyList(tab){
   if(tab==='unread')list=list.filter(n=>n.unread===true);
   else if(tab==='sys')list=list.filter(n=>n.kind==='sys');
   else if(tab==='act')list=list.filter(n=>n.kind==='act'||n.kind==='task');
-  else if(tab==='audit')list=list.filter(n=>n.kind==='audit');
+  else if(tab==='audit')list=list.filter(n=>n.kind==='audit'||n.kind==='reg');
+  // 待处理排序：待处理 + 未读 优先置顶
+  list=list.slice().sort((a,b)=>{
+    const ap=(a.unread&&a.pending)?1:0, bp=(b.unread&&b.pending)?1:0;
+    if(ap!==bp) return bp-ap;
+    return String(b.time||'').localeCompare(String(a.time||''));
+  });
   if(!list.length){box.innerHTML='<div class="empty-tip">暂无通知</div>';return}
-  const routeMap={audit:'audit',act:'activities',task:'tasks',news:'news',sys:'dashboard'};
-  box.innerHTML=list.map(n=>{const r=routeMap[n.kind]||'dashboard';return`<div class="notify-item ${n.unread?'unread':''}" onclick="goNotify('${n.id}','${r}')"><div class="ti">${esc(n.title)}<time>${esc(fmtDateTime(n.time))}</time></div><div class="ct">${esc(n.content)}</div><div class="meta"><span>${esc(n.kind==='audit'?'审核':'活动')}</span><span class="go">查看详情 ›</span></div></div>`}).join('');
+  const routeMap={audit:'audit',act:'activities',task:'tasks',news:'news',sys:'dashboard',reg:'audit',quota:'quota',summary:'summary'};
+  box.innerHTML=list.map(n=>{
+    const r=routeMap[n.kind]||'dashboard';
+    const pending=(n.unread&&n.pending);
+    return`<div class="notify-item ${n.unread?'unread':''} ${pending?'pending':'handled'}" onclick="goNotify('${n.id}','${r}')">
+      <div class="ti">${pending?'<span class="dot-pending" title="待处理"></span>':''}<span class="kind kind-${esc(n.kind||'sys')}">${esc(notifyKindLabel(n.kind))}</span>${esc(n.title)}<time>${esc(fmtDateTime(n.time))}</time></div>
+      <div class="ct">${esc(n.content)}</div>
+      <div class="meta">
+        ${pending?'<span class="badge-pending">待处理</span>':'<span class="badge-handled">已读</span>'}
+        <span class="go">查看详情 ›</span>
+      </div>
+    </div>`;
+  }).join('');
 }
-window.goNotify=(id,route)=>{const n=DB.notifies.find(x=>x.id===id);if(n)n.unread=false;saveDB();updateNotifyBadge();$('#notifyDrawer').hidden=true;goto(route)};
+window.handleNotify=function(id,route){
+  const n=DB.notifies.find(x=>x.id===id);if(n){n.unread=false;n.pending=false;saveDB();updateNotifyBadge();}
+  $('#notifyDrawer').hidden=true;goto(route||'dashboard');
+};
+window.goNotify=(id,route)=>handleNotify(id,route);
 
 const PAGE_TITLES={dashboard:'总控看板',files:'档案中心',service:'服务与加分',reports:'报表中心',print:'资料打印',audit:'审核中心',activities:'活动中心',tasks:'任务中心',news:'新闻·通报',summary:'月度总结',notify:'通知中心',data:'数据中心',broadcaster:'广播部管理',etiquette:'礼仪队管理',subleague:'团副总支',settings:'系统设置·换届',my:'我的档案',report:'举报中心',logs:'操作日志',eval:'评优评先',yearKanban:'年度看板',monthKanban:'月度看板',quota:'团员名额'};
 function renderRoute(){
@@ -666,11 +712,27 @@ const FILE_TEMPLATES={
   '团副总支':{t:'副总支个人信息表',extra:[['acceptMgmt','是否接受工作管理','s',['是','否']],['vexp','团副总支工作经历','t']]},
   '团总支':{t:'负责人个人信息表',extra:[['acceptMgmt','是否接受工作管理','s',['是','否']],['vexp','团总支管理经历','t'],['mgrDuty','分管工作与职责','t']]},
   '学生会':{t:'负责人个人信息表',extra:[['acceptMgmt','是否接受工作管理','s',['是','否']],['vexp','学生工作经历','t'],['mgrDuty','分管工作与职责','t']]},
+  '团委办公室':{t:'团委办公室成员个人信息表',extra:[['mgrDuty','分管工作与职责','t'],['vexp','校务工作经历','t']]},
+  '专业团支部':{t:'专业团支部个人信息表',extra:[['acceptMgmt','是否接受工作管理','s',['是','否']],['vexp','支部工作经历','t'],['mgrDuty','支部工作职责','t']]},
   '负责人':{t:'负责人个人信息表',extra:[['acceptMgmt','是否接受工作管理','s',['是','否']],['vexp','管理岗位工作经历','t'],['mgrDuty','分管工作与职责','t']]}
 };
-function fileTemplateOf(org,role){
-  if(['super','terminal','president','vice','minister'].includes(role))return FILE_TEMPLATES['负责人'];
-  return FILE_TEMPLATES[org]||FILE_TEMPLATES['青年志愿者协会'];
+/* 按部门动态岗位（每个组织独立职位列表，超级管理员可看全部，其他人看本部门 + 通用「成员」） */
+const POSTS_BY_ORG={
+  '团委办公室':['校团委负责人','办公室副主任','办公室成员'],
+  '青年志愿者协会':['协会会长','协会副会长','部长','副部长','组长','成员'],
+  '广播站':['站长','副站长','部长','副部长','成员'],
+  '礼仪队':['队长','副队长','部长','副部长','成员'],
+  '团副总支':['副总支','委员','成员'],
+  '团总支':['支书','副支书','委员','成员'],
+  '学生会':['主席','副主席','部长','副部长','成员'],
+  '专业团支部':['支部书记','副总支','委员','成员']
+};
+function fileTemplateOf(org){ return FILE_TEMPLATES[org]||FILE_TEMPLATES['青年志愿者协会']; }
+function postsByOrg(org){
+  const r=currentUser&&currentUser.role;
+  const isSysAdmin=r==='super'||r==='terminal'||r==='dev';
+  const my=POSTS_BY_ORG[org]||['成员'];
+  return isSysAdmin?my:Array.from(new Set([...my,'成员']));
 }
 let _curFileOrg=''; /* ''=全部档案（系统最高权限窗口） */
 function fileOrgTabs(){
@@ -731,7 +793,7 @@ window.viewAvatar=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u||!u.avatar)re
 window.viewFile=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;const sv=DB.services.filter(s=>s.name===u.name&&s.idCard===u.idCard);openModal(viewFileModal(u,sv))};
 function viewFileModal(u,sv){
   const total=sv.reduce((s,x)=>s+durationHours(x.startDT,x.endDT),0).toFixed(1);
-  const tplX=fileTemplateOf(u.org,u.role);
+  const tplX=fileTemplateOf(u.org);
   const vexpL=(tplX.extra.find(x=>x[0]==='vexp')||[])[1]||'服务经历';
   const extraRows=[[u.langQuality?['是否有语言功底',u.langQuality]:null],[u.langClarity?['普通话讲话是否清晰',u.langClarity]:null],[u.acceptMgmt?['是否接受工作管理',u.acceptMgmt]:null],[u.vexp?[vexpL,u.vexp]:null]].flat().filter(Boolean);
   return`<div class="modal wide"><div class="modal-title"><span class="bar"></span>档案详情 · ${esc(u.name)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="archive-paper">
@@ -748,7 +810,7 @@ function viewFileModal(u,sv){
 /* 档案模板附加字段渲染 / 收集（按部门模板） */
 function renderUfExtra(org){
   const box=$('#ufExtra');if(!box)return;
-  const tpl=fileTemplateOf(org,currentUser.role);
+  const tpl=fileTemplateOf(org);
   const u=window._ufCur||null;
   if(!tpl.extra.length){box.innerHTML='';return}
   box.innerHTML='<div class="full" style="grid-column:1/-1;border-top:1px dashed #e0e0e0;padding-top:10px;margin-top:4px;font-size:13px;color:var(--red);font-weight:600;">『'+tpl.t+'』模板附加项</div>'+tpl.extra.map(([k,l,type,opts])=>{
@@ -766,8 +828,8 @@ window.openUserForm=function(existing){
   const u=existing?DB.users.find(x=>x.id===existing):null,isEdit=!!u;
   window._ufCur=u;
   const initOrg=u?u.org:(_curFileOrg||'青年志愿者协会');
-  const tpl0=fileTemplateOf(initOrg,u?u.role:currentUser.role);
-  const m=openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>${isEdit?'编辑':'录入'}「${tpl0.t}」<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid cols-3">
+  const tpl0=fileTemplateOf(initOrg);
+  const m=openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>${isEdit?'编辑':'录入'}「${tpl0.t}」<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid cols-2">
     <label>姓名<i>*</i><input id="ufName" value="${esc(u?.name||'')}"></label>
     <label>身份证号<i>*</i><input id="ufIdCard" maxlength="18" value="${esc(u?.idCard||'')}"></label>
     <label>角色<select id="ufRole">${(DB.dictionaries.role||[]).filter(x=>x.val!=='dev').map(r=>`<option value="${r.val}" ${u?.role===r.val?'selected':''}>${r.label}</option>`).join('')}</select></label>
@@ -778,8 +840,8 @@ window.openUserForm=function(existing){
     <label>宗教信仰<select id="ufReligion">${(DB.dictionaries.religion||[]).map(n=>`<option ${u?.religion===n?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>专业部<select id="ufDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${u?.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
     <label>班级<select id="ufCls"><option value="">-</option></select></label>
-    <label>所在部门<select id="ufOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option ${(u?.org||initOrg)===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>职位 / 类型<input id="ufTitle" value="${esc(u?.title||'')}"></label>
+    <label>所在部门<i>*</i><select id="ufOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option ${(u?.org||initOrg)===d?'selected':''}>${d}</option>`).join('')}</select></label>
+    <label>职位 / 类型<i>*</i><select id="ufTitle" data-datalist="ufTitleList"></select><datalist id="ufTitleList"></datalist></label>
     <label>邮箱<input id="ufEmail" value="${esc(u?.email||'')}"></label>
     <label>联系电话<input id="ufPhone" value="${esc(u?.phone||'')}"></label>
     <label>QQ（选填）<input id="ufQQ" value="${esc(u?.qq||'')}"></label>
@@ -797,8 +859,22 @@ window.openUserForm=function(existing){
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="ufSave">${isEdit?'保存修改':'提交录入'}</button></div></div>`);
   const setCls=()=>{const list=(DB.dictionaries.classes[$('#ufDept').value]||[]);$('#ufCls').innerHTML='<option value="">-</option>'+list.map(c=>`<option ${u?.cls===c?'selected':''}>${c}</option>`).join('')};
   setCls();$('#ufDept').onchange=setCls;$('#ufStatus').value=u?.status||'正常在岗';
+  /* 部门 ↔ 职位 联动：切换部门时刷新职位 datalist；编辑时按所在部门预填当前职位 */
+  const initTitle=u?.title||'';
+  const refTitle=()=>{
+    const list=postsByOrg($('#ufOrg').value||'青年志愿者协会');
+    const dat=$('#ufTitleList');if(dat)dat.innerHTML=list.map(p=>`<option value="${p}">`).join('');
+    const tEl=$('#ufTitle');
+    if(tEl){
+      const cur=u?.title||tEl.value||'';
+      const inList=list.includes(cur);
+      const opts=list.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p}</option>`).join('')+(cur&&!inList?`<option value="${cur}" selected>${cur}（自定义）</option>`:'');
+      tEl.innerHTML=opts;
+    }
+  };
+  refTitle();
   renderUfExtra(initOrg);
-  $('#ufOrg').onchange=()=>{renderUfExtra($('#ufOrg').value);window._ufCur=u};
+  $('#ufOrg').onchange=()=>{renderUfExtra($('#ufOrg').value);refTitle();/* 同时刷新 modal 标题 */const t=fileTemplateOf($('#ufOrg').value);const tEl=m&&m.querySelector&&m.querySelector('.modal-title');if(tEl)tEl.innerHTML=`<span class="bar"></span>${isEdit?'编辑':'录入'}「${t.t}」<span class="bar"></span><button class="x" data-close-modal>×</button>`;window._ufCur=u};
   if(u&&u.avatar)$('#ufPreview').innerHTML=`<img src="${u.avatar}" style="width:100px;height:130px;object-fit:cover;border-radius:2px;margin-top:6px;">`;
   $('#ufSave').onclick=()=>{
     const idCard=$('#ufIdCard').value.trim(),name=$('#ufName').value.trim();
