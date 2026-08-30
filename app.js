@@ -24,24 +24,10 @@ function seedDB(){
     league:'中国共产主义青年团宣汉职业中专学校委员会', leagueShort:'校团委',
     period:'2026 秋季学期',
     users:[
-      {id:'u-super',role:'super',org:'超级管理员',name:'系统管理员',idCard:'000000000000000001',pwd:'admin123',phone:'13900000001',email:'admin@xhzx.edu.cn',title:'超级管理员',avatar:'',dept:'',cls:'',gender:'男',nation:'汉族',politics:'中共党员',position:'会长',activated:true},
-      {id:'u-term',role:'terminal',org:'校团委',name:'校团委管理员',idCard:'000000000000000002',pwd:'term123',phone:'13900000002',title:'管理员',avatar:'',dept:'',cls:'',activated:true},
-      {id:'u-prez',role:'president',org:'青年志愿者协会',name:'张志远',idCard:'000000000000000003',pwd:'prez123',phone:'13900000003',title:'会 长',avatar:'',dept:'综合高中',cls:'24级综合高中1班',gender:'男',nation:'汉族',politics:'共青团员',position:'会长',activated:true},
-      {id:'u-vice',role:'vice',org:'青年志愿者协会',name:'李欣怡',idCard:'000000000000000004',pwd:'vice123',phone:'13900000004',title:'副会长',avatar:'',dept:'财经',cls:'25级会计2班',gender:'女',nation:'汉族',politics:'共青团员',position:'副会长',activated:true},
-      {id:'u-min',role:'minister',org:'青年志愿者协会',name:'王浩然',idCard:'000000000000000005',pwd:'min123',phone:'13900000005',title:'部长',avatar:'',dept:'电子',cls:'24级电子2班',gender:'男',nation:'汉族',politics:'共青团员',position:'部长',activated:true},
-      {id:'u-bc',role:'broadcaster',org:'广播站',name:'陈思雨',idCard:'000000000000000006',pwd:'bc123',phone:'13900000006',title:'广播员',avatar:'',dept:'航高',cls:'24级航空3班',gender:'女',nation:'汉族',politics:'共青团员',position:'广播员',activated:true},
-      {id:'u-et',role:'etiquette',org:'礼仪队',name:'赵雨涵',idCard:'000000000000000007',pwd:'et123',phone:'13900000007',title:'礼仪队员',avatar:'',dept:'现代服务',cls:'24级幼保1班',gender:'女',nation:'汉族',politics:'共青团员',position:'队员',activated:true},
-      {id:'u-sl',role:'subleague',org:'团副总支',name:'刘子涵',idCard:'000000000000000008',pwd:'sl123',phone:'13900000008',title:'副总支副书记',avatar:'',dept:'机建',cls:'24级机电1班',gender:'男',nation:'汉族',politics:'共青团员',position:'副书记',activated:true},
-      {id:'u-mem',role:'member',org:'青年志愿者协会',name:'杨静雯',idCard:'000000000000000009',pwd:'mem123',phone:'13900000009',title:'志愿者',avatar:'',dept:'综合高中',cls:'25级综合高中2班',gender:'女',nation:'汉族',politics:'群众',position:'志愿者',activated:true},
-      {id:'u-m1',role:'member',org:'广播站',name:'宋佳怡',idCard:'000000000000000010',pwd:'mem123',phone:'13900000010',title:'广播员',avatar:'',dept:'航高',cls:'25级航空1班',gender:'女',nation:'汉族',politics:'共青团员',position:'广播员',activated:true},
-      {id:'u-m2',role:'member',org:'广播站',name:'罗一鸣',idCard:'000000000000000011',pwd:'mem123',phone:'13900000011',title:'广播员',avatar:'',dept:'航高',cls:'25级航空2班',gender:'男',nation:'汉族',politics:'群众',position:'广播员',activated:true},
-      {id:'u-m3',role:'member',org:'广播站',name:'唐婉清',idCard:'000000000000000012',pwd:'mem123',phone:'13900000012',title:'广播员',avatar:'',dept:'航高',cls:'25级航空3班',gender:'女',nation:'汉族',politics:'共青团员',position:'广播员',activated:true},
-      {id:'u-m4',role:'member',org:'礼仪队',name:'林雨欣',idCard:'000000000000000013',pwd:'mem123',phone:'13900000013',title:'礼仪队员',avatar:'',dept:'现代服务',cls:'24级幼保1班',gender:'女',nation:'汉族',politics:'共青团员',position:'礼仪队员',activated:true},
-      {id:'u-m5',role:'member',org:'礼仪队',name:'冯雅婷',idCard:'000000000000000014',pwd:'mem123',phone:'13900000014',title:'礼仪队员',avatar:'',dept:'现代服务',cls:'24级幼保2班',gender:'女',nation:'汉族',politics:'群众',position:'礼仪队员',activated:true},
-      {id:'u-m6',role:'member',org:'礼仪队',name:'黄可馨',idCard:'000000000000000015',pwd:'mem123',phone:'13900000015',title:'礼仪队员',avatar:'',dept:'现代服务',cls:'25级养护1班',gender:'女',nation:'汉族',politics:'共青团员',position:'礼仪队员',activated:true},
-      {id:'u-m7',role:'member',org:'团副总支',name:'何俊杰',idCard:'000000000000000016',pwd:'mem123',phone:'13900000016',title:'副总支成员',avatar:'',dept:'机建',cls:'24级机电1班',gender:'男',nation:'汉族',politics:'共青团员',position:'成员',activated:true},
-      {id:'u-m8',role:'member',org:'团副总支',name:'周子昂',idCard:'000000000000000017',pwd:'mem123',phone:'13900000017',title:'副总支成员',avatar:'',dept:'机建',cls:'25级机电1班',gender:'男',nation:'汉族',politics:'群众',position:'成员',activated:true},
-      {id:'u-m9',role:'member',org:'团副总支',name:'吴梦洁',idCard:'000000000000000018',pwd:'mem123',phone:'13900000018',title:'副总支成员',avatar:'',dept:'机建',cls:'25级机电2班',gender:'女',nation:'汉族',politics:'共青团员',position:'成员',activated:true},
+      /* 纯净系统：只留 3 个系统账号（终端管理员 + 超级管理员/校团委 + 开发维护），
+         其他演示账号全部清除，由用户录入真实人员 */
+      {id:'u-super',role:'super',org:'校团委',name:'校团委管理员',idCard:'000000000000000001',pwd:'admin123',phone:'13900000001',email:'admin@xhzx.edu.cn',title:'校团委管理员',avatar:'',dept:'',cls:'',gender:'男',nation:'汉族',politics:'中共党员',position:'校团委',activated:true},
+      {id:'u-term',role:'terminal',org:'校团委',name:'终端管理员',idCard:'000000000000000002',pwd:'term123',phone:'13900000002',title:'系统维护',avatar:'',dept:'',cls:'',activated:true},
       {id:'u-dev',role:'dev',org:'开发人员',name:'开发维护',idCard:'000000000000000099',pwd:'dev123',phone:'13900000099',title:'系统开发',avatar:'',dept:'',cls:'',activated:true}
     ],
     dictionaries:{
@@ -164,10 +150,14 @@ function normalizeDB(db){
       db.dictionaries.classes[dept]=[...exist];
     });
   }
-  // 一次性合并种子账号（v13 新增广播站/礼仪队/团副总支成员等），按身份证去重；带版本标记避免已删档案复活
+  // 一次性合并 3 个系统账号（终端管理员 + 校团委管理员 + 开发维护），其他演示账号不再注入；带版本标记避免已删档案复活
+  const SYSTEM_IDS=['u-super','u-term','u-dev'];
   if(!db._seedV){
-    (seedDB().users||[]).forEach(su=>{ if(!db.users.some(u=>u.idCard===su.idCard)) db.users.push(su); });    db._seedV=2;
+    (seedDB().users||[]).forEach(su=>{ if(SYSTEM_IDS.includes(su.id) && !db.users.some(u=>u.idCard===su.idCard)) db.users.push(su); });
+    db._seedV=3;
   }
+  // 兜底：移除非系统账号的演示用户（如有遗留 u-prez/u-mem 等），保持纯净
+  db.users=(db.users||[]).filter(u=>SYSTEM_IDS.includes(u.id) || (u.pwd && u.idCard && u.name));
   (db.users||[]).forEach(u=>{
     if(!u.grade) u.grade=deriveGrade(u.cls||'');
     if(!u.totpSecret) u.totpSecret=genSecret();
