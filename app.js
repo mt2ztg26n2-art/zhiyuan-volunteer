@@ -42,11 +42,12 @@ function seedDB(){
       {id:'u-m7',role:'member',org:'团副总支',name:'何俊杰',idCard:'000000000000000016',pwd:'mem123',phone:'13900000016',title:'副总支成员',avatar:'',dept:'机建',cls:'24级机电1班',gender:'男',nation:'汉族',politics:'共青团员',position:'成员',activated:true},
       {id:'u-m8',role:'member',org:'团副总支',name:'周子昂',idCard:'000000000000000017',pwd:'mem123',phone:'13900000017',title:'副总支成员',avatar:'',dept:'机建',cls:'25级机电1班',gender:'男',nation:'汉族',politics:'群众',position:'成员',activated:true},
       {id:'u-m9',role:'member',org:'团副总支',name:'吴梦洁',idCard:'000000000000000018',pwd:'mem123',phone:'13900000018',title:'副总支成员',avatar:'',dept:'机建',cls:'25级机电2班',gender:'女',nation:'汉族',politics:'共青团员',position:'成员',activated:true},
+      {id:'u-system',role:'system',org:'校团委',name:'系统管理员（本人）',idCard:'000000000000000000',pwd:'sys1234',phone:'13900000000',email:'system@xhzx.edu.cn',title:'系统管理员',avatar:'',dept:'',cls:'',gender:'男',nation:'汉族',politics:'中共党员',position:'系统管理员',activated:true,createdAt:now()},
       {id:'u-dev',role:'dev',org:'开发人员',name:'开发维护',idCard:'000000000000000099',pwd:'dev123',phone:'13900000099',title:'系统开发',avatar:'',dept:'',cls:'',activated:true}
     ],
     dictionaries:{
       role:[
-        {val:'super',label:'超级管理员'},{val:'terminal',label:'终端管理员'},{val:'president',label:'会 长'},
+        {val:'system',label:'系统管理员'},{val:'super',label:'超级管理员'},{val:'terminal',label:'终端管理员'},{val:'president',label:'会 长'},
         {val:'vice',label:'副 会 长'},{val:'minister',label:'部长/站长'},{val:'broadcaster',label:'广播站员'},
         {val:'etiquette',label:'礼仪队员'},{val:'subleague',label:'团副总支'},{val:'member',label:'志愿者'},{val:'dev',label:'开发人员'}
       ],
@@ -98,11 +99,47 @@ function seedDB(){
       {id:'n-2',title:'志愿服务智慧管理平台正式上线',type:'新闻',priority:'推荐',publisher:'青年志愿者协会',publishedAt:'2026-04-28 09:00',reads:86,content:'为推进志愿服务信息化管理，我校志愿服务智慧管理平台今日正式启用。',photos:[]}
     ],
     notifies:[
-      {id:'nt-1',to:'超级管理员',kind:'audit',title:'新注册待审核',content:'小张 提交注册，请审核',time:'2026-08-29 11:00',unread:true},
-      {id:'nt-2',to:'all',kind:'sys',title:'平台上线通知',content:'志愿服务智慧管理平台正式上线，欢迎试用。',time:'2026-08-28 09:00',unread:true},
-      {id:'nt-3',to:'all',kind:'act',title:'新活动发布',content:'《2026年五四诵唱比赛志愿服务》招募中',time:'2026-04-25 09:00',unread:false}
+      {id:'nt-1',to:'超级管理员',kind:'audit',title:'新注册待审核',content:'小张 提交注册，请审核',time:'2026-08-29 11:00',unread:true,pending:true},
+      {id:'nt-2',to:'all',kind:'sys',title:'平台上线通知',content:'志愿服务智慧管理平台正式上线，欢迎试用。',time:'2026-08-28 09:00',unread:true,pending:false},
+      {id:'nt-3',to:'all',kind:'act',title:'新活动发布',content:'《2026年五四诵唱比赛志愿服务》招募中',time:'2026-04-25 09:00',unread:false,pending:false},
+      {id:'nt-4',to:'会 长',kind:'audit',title:'待审团员名额申请',content:'2026 上期有 2 名同学提交团员名额推荐，请审核',time:'2026-04-20 10:00',unread:true,pending:true},
+      {id:'nt-5',to:'all',kind:'news',title:'4 月志愿服务之星揭晓',content:'本月服务时长 TOP3 已公布，请到数据中心查看',time:'2026-04-30 09:00',unread:false,pending:false}
     ],
-    logs:[], reports:[], broadcastRecs:[], etiquetteRecs:[], subleagueRecs:[], summaries:[], quotas:[],
+    activities:[
+      {id:'act-1',title:'2026 年五四诵唱比赛志愿服务',desc:'负责比赛现场秩序、接待嘉宾、舞台协助',cover:'',date:'2026-04-30',location:'校田径场',startDT:'2026-04-30 13:00',endDT:'2026-04-30 18:00',signupLimit:30,signups:['u-mem','u-m4','u-m5'],publisher:'校团委',status:'published',createdAt:'2026-04-20 09:00',covers:[]},
+      {id:'act-2',title:'校园招聘志愿服务',desc:'协助企业布展、引导毕业生',cover:'',date:'2026-05-15',location:'学校体育馆',startDT:'2026-05-15 08:00',endDT:'2026-05-15 17:00',signupLimit:25,signups:['u-prez','u-vice'],publisher:'青年志愿者协会',status:'published',createdAt:'2026-05-10 10:00',covers:[]},
+      {id:'act-3',title:'社区老人关爱志愿活动',desc:'走进社区陪伴老人聊天、打扫',cover:'',date:'2026-04-12',location:'宣汉县社区服务中心',startDT:'2026-04-12 14:00',endDT:'2026-04-12 17:00',signupLimit:20,signups:['u-mem','u-m6','u-m9'],publisher:'青年志愿者协会',status:'completed',createdAt:'2026-04-08 14:00',covers:[]}
+    ],
+    tasks:[
+      {id:'task-1',title:'本周校园卫生志愿者值日',publisher:'青年志愿者协会',startDT:'2026-04-15 08:00',endDT:'2026-04-15 12:00',status:'open',signups:['u-prez','u-vice','u-mem'],createdAt:'2026-04-14 10:00'},
+      {id:'task-2',title:'图书馆整理上架',publisher:'青年志愿者协会',startDT:'2026-04-20 14:00',endDT:'2026-04-20 17:00',status:'open',signups:['u-mem'],createdAt:'2026-04-19 09:00'}
+    ],
+    services:[
+      {id:'s-1',name:'杨静雯',idCard:'000000000000000009',dept:'综合高中',cls:'25级综合高中2班',org:'青年志愿者协会',activity:'校园招聘志愿服务',startDT:'2026-05-15 08:00',endDT:'2026-05-15 12:00',duration:4,location:'学校体育馆',serviceBy:'张志远',createdAt:'2026-05-15 12:30'},
+      {id:'s-2',name:'林雨欣',idCard:'000000000000000013',dept:'现代服务',cls:'24级幼保1班',org:'礼仪队',activity:'校园招聘志愿服务接待',startDT:'2026-05-15 08:00',endDT:'2026-05-15 12:00',duration:4,location:'学校体育馆',serviceBy:'赵雨涵',createdAt:'2026-05-15 12:30'},
+      {id:'s-3',name:'冯雅婷',idCard:'000000000000000014',dept:'现代服务',cls:'24级幼保2班',org:'礼仪队',activity:'校园招聘志愿服务接待',startDT:'2026-05-15 08:00',endDT:'2026-05-15 12:00',duration:4,location:'学校体育馆',serviceBy:'赵雨涵',createdAt:'2026-05-15 12:30'},
+      {id:'s-4',name:'何俊杰',idCard:'000000000000000016',dept:'机建',cls:'24级机电1班',org:'团副总支',activity:'社区老人关爱志愿活动',startDT:'2026-04-12 14:00',endDT:'2026-04-12 17:00',duration:3,location:'宣汉县社区服务中心',serviceBy:'刘子涵',createdAt:'2026-04-12 17:30'},
+      {id:'s-5',name:'吴梦洁',idCard:'000000000000000018',dept:'机建',cls:'25级机电2班',org:'团副总支',activity:'社区老人关爱志愿活动',startDT:'2026-04-12 14:00',endDT:'2026-04-12 17:00',duration:3,location:'宣汉县社区服务中心',serviceBy:'刘子涵',createdAt:'2026-04-12 17:30'},
+      {id:'s-6',name:'宋佳怡',idCard:'000000000000000010',dept:'航高',cls:'25级航空1班',org:'广播站',activity:'五四诵唱比赛播音',startDT:'2026-04-30 13:00',endDT:'2026-04-30 18:00',duration:5,location:'校田径场',serviceBy:'陈思雨',createdAt:'2026-04-30 18:30'}
+    ],
+    broadcastRecs:[
+      {id:'br-1',date:'2026-04-28',title:'校园安全提醒',minutes:10,broadcaster:'陈思雨',publisher:'陈思雨',createdAt:'2026-04-28 12:00'},
+      {id:'br-2',date:'2026-04-29',title:'五四诵唱比赛预告',minutes:8,broadcaster:'宋佳怡',publisher:'陈思雨',createdAt:'2026-04-29 12:00'},
+      {id:'br-3',date:'2026-04-30',title:'志愿服务表彰通报',minutes:12,broadcaster:'罗一鸣',publisher:'陈思雨',createdAt:'2026-04-30 18:00'}
+    ],
+    etiquetteRecs:[
+      {id:'er-1',date:'2026-04-15',title:'校园开放日礼仪接待',leaders:['赵雨涵','林雨欣','冯雅婷'],count:8,publisher:'赵雨涵',createdAt:'2026-04-15 17:00'},
+      {id:'er-2',date:'2026-05-15',title:'校园招聘接待礼仪',leaders:['赵雨涵','林雨欣'],count:6,publisher:'赵雨涵',createdAt:'2026-05-15 12:00'}
+    ],
+    subleagueRecs:[
+      {id:'sr-1',date:'2026-04-12',title:'社区老人关爱志愿服务',participants:['何俊杰','吴梦洁','周子昂'],count:15,publisher:'刘子涵',createdAt:'2026-04-12 18:00'},
+      {id:'sr-2',date:'2026-04-25',title:'团支部组织生活会',participants:['何俊杰','周子昂','吴梦洁'],count:18,publisher:'刘子涵',createdAt:'2026-04-25 18:00'}
+    ],
+    quotas:[
+      {id:'q-1',name:'李欣怡',idCard:'000000000000000004',dept:'财经',cls:'25级会计2班',kind:'自荐',status:'review',reason:'积极参与志愿活动，服务时长累计 30 小时',trace:[{act:'提交申请',st:'recommend',time:now()},{act:'推荐送审',st:'review',time:now()}],createdAt:now()},
+      {id:'q-2',name:'王浩然',idCard:'000000000000000005',dept:'电子',cls:'24级电子2班',kind:'推荐',status:'review',reason:'担任部长表现突出，志愿服务时长 50 小时',trace:[{act:'提交申请',st:'recommend',time:now()},{act:'推荐送审',st:'review',time:now()}],createdAt:now()}
+    ],
+    logs:[], reports:[], summaries:[], traces:[],
     nextIds:{user:200,service:100,activity:10,task:10,news:10,notify:10,summary:10,report:10}
   };
 }
@@ -111,9 +148,15 @@ function normalizeDB(db){
   if(!db.rules) db.rules={scorePerPerson:0.1,deptMultiplier:0.5};
   if(!db.reports) db.reports=[];
   if(!db.logs) db.logs=[];
+  if(!db.traces) db.traces=[];
   if(!db.evaluations) db.evaluations=[];
   if(!db.quotas) db.quotas=[];
   if(!db.nextIds) db.nextIds={};
+  // 系统管理员账号（仅存在一次）：u-system（本人系统级账号）
+  if(!db.users.some(u=>u.id==='u-system')){
+    const sysSeed=(seedDB().users||[]).find(u=>u.id==='u-system');
+    if(sysSeed) db.users.unshift(sysSeed);
+  }
   // 字典增量合并：保留用户已有数据，向 organizations/positions/classes 追加新条目（不覆盖）
   const seed=seedDB();
   const orgs=new Set([...(db.dictionaries.organizations||[]),...(seed.dictionaries.organizations||[])]);
@@ -256,11 +299,14 @@ function confirmDialog(msg,onYes,title){openModal(`<div class="modal" style="wid
 
 
 /* ============================== 角色 ============================== */
-const ROLE_RANK={super:100,terminal:90,dev:99,president:80,vice:75,minister:73,broadcaster:72,etiquette:72,subleague:72,member:10};
+const ROLE_RANK={system:110,super:100,terminal:90,dev:99,president:80,vice:75,minister:73,broadcaster:72,etiquette:72,subleague:72,member:10};
 function canEdit(){return currentUser&&ROLE_RANK[currentUser.role]>=60}
 function isSuper(){return currentUser&&currentUser.role==='super'}
 function isTerminal(){return currentUser&&currentUser.role==='terminal'}
-function isAdmin(){return currentUser&&(isSuper()||isTerminal())}
+function isSystem(){return currentUser&&currentUser.role==='system'}
+/* 痕迹日志：只有 system/terminal 可见（最高权限 + 终端管理员），super 等看不到 */
+function canSeeTrace(){return currentUser&&(isSystem()||isTerminal());}
+function isAdmin(){return currentUser&&(isSystem()||isSuper()||isTerminal())}
 function roleLabel(r){const m=(DB.dictionaries.role||[]).find(x=>x.val===r)||{};return m.label||r}
 function roleClass(r){return['super','terminal','president','vice','minister','broadcaster','etiquette','subleague','member'].includes(r)?r:'member'}
 /* 集成系统模块权限：
@@ -278,6 +324,8 @@ function canSee(route){
   if(route==='etiquette'&&(r==='etiquette'||isAdmin()))return true;
   if(route==='subleague'&&(r==='subleague'||isAdmin()))return true;
   if(route==='quota'&&(isAdmin()||manager||currentUser.role==='member'))return true;
+  /* 痕迹日志：只有 system 最高权限 / terminal 终端管理员 可见（super 等被设置的角色看不到自己被监控的痕迹） */
+  if(route==='traces')return canSeeTrace();
   return false;
 }
 
@@ -308,6 +356,7 @@ function buildSidebar(){
     report:I('<path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6z"/><path d="M12 8v4M12 16h.01"/>'),
     settings:I('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
     logs:I('<path d="M3 6h13M3 12h13M3 18h13M19 6l3 3-3 3M19 12h2M19 18l3 3-3 3"/>'),
+    traces:I('<path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="1.5"/>'),
     eval:I('<circle cx="12" cy="8" r="6"/><path d="M9 14l-2 8 5-3 5 3-2-8"/><circle cx="12" cy="8" r="2"/>')
   };
   const all=[
@@ -332,6 +381,7 @@ function buildSidebar(){
     {k:'my',name:'我的档案',ico:IC.my},
     {k:'report',name:'举报中心',ico:IC.report},
     {k:'settings',name:'系统设置·换届',ico:IC.settings},
+    {k:'traces',name:'痕迹日志',ico:IC.traces},
     {k:'logs',name:'操作日志',ico:IC.logs},
     {k:'eval',name:'评优评先',ico:IC.eval}
   ].filter(it=>canSee(it.k));
@@ -341,7 +391,7 @@ function buildSidebar(){
     {title:'业务中心',items:all.filter(i=>['activities','tasks','news','summary','yearKanban','monthKanban','notify'].includes(i.k))},
     {title:'部门独立',items:all.filter(i=>['broadcaster','etiquette','subleague','quota'].includes(i.k))},
     {title:'个人',items:all.filter(i=>['my','report'].includes(i.k))},
-    {title:'系统',items:all.filter(i=>['settings','logs','eval'].includes(i.k))}
+    {title:'系统',items:all.filter(i=>['settings','traces','logs','eval'].includes(i.k))}
   ].filter(g=>g.items.length);
 
   nav.innerHTML=groups.map(g=>`<div class="group-title">${esc(g.title)}</div>${g.items.map(it=>`<a data-route="${it.k}" class="${currentRoute()===it.k?'active':''}">${it.ico||''}<span>${esc(it.name)}</span></a>`).join('')}`).join('');
@@ -601,6 +651,18 @@ function doForgot(){
 
 function doLogout(){localStorage.removeItem(LS_USR);toast('已退出登录','ok');location.reload()}
 function pushLog(action,content){DB.logs.unshift({id:uid('l'),time:now(),user:currentUser?currentUser.name:'-',role:currentUser?currentUser.role:'-',action,content});if(DB.logs.length>1000)DB.logs.length=1000;saveDB()}
+/* 痕迹日志：记录数据级操作（前后值差异），仅 system/terminal 可见
+ * action: 操作类型 如 "审核通过"、"修改档案"、"任命"、"注销"
+ * target: 操作对象 "user档案:张三"、"活动:五四诵唱"
+ * before/after: 改前/改后快照（自动 JSON.stringify 比较）
+ * hint: 额外描述（可选） */
+window.pushTrace=function(action,target,before,after,hint){
+  try{
+    if(!canSeeTrace()) return; /* 非痕迹日志可见角色不记录（节省） */
+    const t={id:uid('tr'),time:now(),user:currentUser?currentUser.name:'-',role:currentUser?currentUser.role:'-',action,target,hint:hint||'',before:JSON.stringify(before||{}).slice(0,4000),after:JSON.stringify(after||{}).slice(0,4000)};
+    DB.traces=DB.traces||[]; DB.traces.unshift(t);if(DB.traces.length>2000)DB.traces.length=2000;saveDB();
+  }catch(e){}
+};
 function pushNotify(o){DB.notifies.unshift(Object.assign({id:uid('nt'),time:now(),unread:true,pending:true},o));saveDB();updateNotifyBadge()}
 
 function badgeText(n){
@@ -655,11 +717,11 @@ window.handleNotify=function(id,route){
 };
 window.goNotify=(id,route)=>handleNotify(id,route);
 
-const PAGE_TITLES={dashboard:'总控看板',files:'档案中心',service:'服务与加分',reports:'报表中心',print:'资料打印',audit:'审核中心',activities:'活动中心',tasks:'任务中心',news:'新闻·通报',summary:'月度总结',notify:'通知中心',data:'数据中心',broadcaster:'广播部管理',etiquette:'礼仪队管理',subleague:'团副总支',settings:'系统设置·换届',my:'我的档案',report:'举报中心',logs:'操作日志',eval:'评优评先',yearKanban:'年度看板',monthKanban:'月度看板',quota:'团员名额'};
+const PAGE_TITLES={dashboard:'总控看板',files:'档案中心',service:'服务与加分',reports:'报表中心',print:'资料打印',audit:'审核中心',activities:'活动中心',tasks:'任务中心',news:'新闻·通报',summary:'月度总结',notify:'通知中心',data:'数据中心',broadcaster:'广播部管理',etiquette:'礼仪队管理',subleague:'团副总支',settings:'系统设置·换届',my:'我的档案',report:'举报中心',logs:'操作日志',traces:'痕迹日志',eval:'评优评先',yearKanban:'年度看板',monthKanban:'月度看板',quota:'团员名额'};
 function renderRoute(){
   if(!currentUser)return;
   highlightNav();
-  const map={'':renderDashboard,'dashboard':renderDashboard,'files':renderFiles,'service':renderService,'reports':renderReports,'print':renderPrint,'audit':renderAudit,'activities':renderActivities,'tasks':renderTasks,'news':renderNews,'summary':renderSummary,'notify':renderNotify,'data':renderData,'broadcaster':renderBroadcaster,'etiquette':renderEtiquette,'subleague':renderSubleague,'settings':renderSettings,'my':renderMy,'report':renderReport,'logs':renderLogs,'eval':renderEval,'yearKanban':renderYearKanban,'monthKanban':renderMonthKanban,'quota':renderQuota};
+  const map={'':renderDashboard,'dashboard':renderDashboard,'files':renderFiles,'service':renderService,'reports':renderReports,'print':renderPrint,'audit':renderAudit,'activities':renderActivities,'tasks':renderTasks,'news':renderNews,'summary':renderSummary,'notify':renderNotify,'data':renderData,'broadcaster':renderBroadcaster,'etiquette':renderEtiquette,'subleague':renderSubleague,'settings':renderSettings,'my':renderMy,'report':renderReport,'logs':renderLogs,'traces':renderTraces,'eval':renderEval,'yearKanban':renderYearKanban,'monthKanban':renderMonthKanban,'quota':renderQuota};
   let cr=currentRoute();
   if(!canSee(cr)) cr='dashboard';
   const fn=map[cr]||renderDashboard;

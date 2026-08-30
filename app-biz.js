@@ -242,8 +242,8 @@ function renderAuditQuota(){
   if(!qs.length){t.innerHTML='<div class="empty-tip">暂无待审名额申请，提交申请后会自动出现在这里</div>';return}
   t.innerHTML=qs.map(q=>`<div style="padding:12px 14px;background:#fff;margin-bottom:10px;border-radius:2px;"><div style="display:flex;justify-content:space-between;"><b>${esc(q.name)}</b><span class="tag ${q.status==='review'?'':'warn'}">${q.status==='review'?'待审核':'待送审'}</span></div><div class="f12 c-3 mt-8">${esc(q.kind||'推荐')} · ${esc(q.dept||'-')} / ${esc(q.cls||'-')} · 提交 ${esc(fmtDateTime(q.createdAt))}</div><div class="f12 c-3">事由：${esc(q.reason||'-')}</div>${(q.trace||[]).length?`<div class="trace mt-8">${q.trace.map(t=>`<span class="trace-dot ${t.st}"></span>${esc(t.act)}·${esc((t.time||'').slice(5,16))}`).join(' ')}</div>`:''}<div class="mt-8" style="display:flex;gap:6px;">${q.status==='recommend'?`<button style="height:28px;padding:0 14px;" onclick="quotaSubmit('${q.id}')">送审</button>`:''}<button class="primary" style="height:28px;padding:0 14px;" onclick="quotaApprove('${q.id}')">通过</button><button class="warn" style="height:28px;padding:0 14px;" onclick="quotaReject('${q.id}')">驳回</button></div></div>`).join('');
 }
-window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');/* 云端：写入审核状态 + 删除已处理注册条目 */if(window.ZYStatus)ZYStatus.set(u.idCard,'approved');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已审核通过','ok')}};
-window.auditRejectUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认驳回 <b>${esc(u.name)}</b> 的注册申请？`,()=>{u.pending=false;u.activated=false;saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核驳回',content:`${u.name}，您的注册申请未通过审核，请联系团委管理员。`});pushLog('审核','驳回 '+u.name+' 的注册');if(window.ZYStatus)ZYStatus.set(u.idCard,'rejected');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已驳回','ok')},'驳回注册')};
+window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){const before={pending:!!u.pending,activated:!!u.activated,status:u.status};u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');pushTrace('审核通过','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:true,status:u.status});/* 云端：写入审核状态 + 删除已处理注册条目 */if(window.ZYStatus)ZYStatus.set(u.idCard,'approved');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已审核通过','ok')}};
+window.auditRejectUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认驳回 <b>${esc(u.name)}</b> 的注册申请？`,()=>{const before={pending:!!u.pending,activated:!!u.activated};u.pending=false;u.activated=false;saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核驳回',content:`${u.name}，您的注册申请未通过审核，请联系团委管理员。`});pushLog('审核','驳回 '+u.name+' 的注册');pushTrace('审核驳回','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:false});if(window.ZYStatus)ZYStatus.set(u.idCard,'rejected');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已驳回','ok')},'驳回注册')};
 window.auditQuery=()=>{
   const id=$('#adId').value.trim(),name=$('#adName').value.trim();
   if(!id||!name)return toast('请同时输入身份证号和姓名','err');
@@ -702,6 +702,39 @@ window.handleReport=function(id){
 };
 
 /* ============================== 操作日志 ============================== */
+function renderTraces(root){
+  if(!canSeeTrace()){ root.innerHTML='<div class="empty-tip" style="padding:80px;text-align:center;color:var(--ink-3);">您当前角色不可查看痕迹日志<br><span class="f12">（仅终端管理员 / 系统管理员可查看）</span></div>'; return; }
+  const list=DB.traces||[];
+  root.innerHTML=`
+    <div class="page-block">${blockHead('痕迹日志（<span id="trCount">0</span>）','<button class="ghost" onclick="exportTraces()">导出 Excel</button>')}
+      <div class="block-body">
+        <div class="tip-line">记录数据级操作痕迹（修改/删除/审核/任命的<span class="b">前后值差异</span>），便于系统维护时追溯"谁动了哪些数据"。<b>仅终端管理员 / 系统管理员可查看</b>（超级管理员等被设置的角色看不到，避免他们反查终端管理员）。</div>
+        <table class="tbl"><thead><tr><th style="width:140px">时间</th><th style="width:80px">操作人</th><th style="width:90px">角色</th><th style="width:100px">操作</th><th style="width:140px">对象</th><th>前后值差异</th></tr></thead><tbody id="trBody"></tbody></table>
+      </div>
+    </div>`;
+  const rows=list.slice(0,500);
+  $('#trCount').textContent=list.length;
+  $('#trBody').innerHTML=rows.map(t=>{
+    let diff='';
+    try{
+      const b=JSON.parse(t.before||'{}'),a=JSON.parse(t.after||'{}');
+      const keys=new Set([...Object.keys(b||{}),...Object.keys(a||{})]);
+      diff=Array.from(keys).map(k=>{
+        const x=b[k],y=a[k];
+        if(JSON.stringify(x)===JSON.stringify(y)) return `<span class="f12 c-3">${esc(k)}=${esc(JSON.stringify(x)||'-')}</span>`;
+        return `<div class="f12"><b>${esc(k)}</b>: <span style="background:#fff1d6;color:#d46b08;padding:1px 6px;">${esc(JSON.stringify(x||'')||'(空)')}</span> → <span style="background:#d9f7be;color:#389e0d;padding:1px 6px;">${esc(JSON.stringify(y||'')||'(空)')}</span></div>`;
+      }).join('') || '<span class="c-3 f12">（无字段差异）</span>';
+    }catch(e){ diff='<span class="c-3 f12">'+esc(t.hint||'')+'</span>'; }
+    return `<tr><td>${esc(fmtDateTime(t.time))}</td><td>${esc(t.user)}</td><td>${esc(roleLabel(t.role))}</td><td><span style="background:#fff1d6;color:#d46b08;padding:2px 8px;border-radius:4px;font-size:12px;">${esc(t.action)}</span></td><td>${esc(t.target||'-')}</td><td>${diff}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty-tip">暂无痕迹日志</td></tr>';
+  window.exportTraces=function(){
+    if(!window.XLSX)return toast('导出模块未加载','err');
+    const ws=XLSX.utils.json_to_sheet((DB.traces||[]).map(t=>({时间:t.time,操作人:t.user,角色:roleLabel(t.role),操作:t.action,对象:t.target,变更字段:t.hint||''})));
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'痕迹日志');
+    XLSX.writeFile(wb,'痕迹日志.xlsx');
+  };
+}
+
 function renderLogs(root){
   root.innerHTML=`
     <div class="search-bar">
