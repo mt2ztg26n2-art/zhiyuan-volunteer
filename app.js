@@ -335,6 +335,10 @@ function canSee(route){
   if(route==='quota'&&(isAdmin()||manager||currentUser.role==='member'))return true;
   /* 痕迹日志：仅终端管理员（系统最高权限者）可见，超级管理员（校团委）看不到 */
   if(route==='traces')return canSeeTrace();
+  /* 终端管理员 = 系统维护者（不录入业务数据，只维护系统/账号/日志），
+     故只显示：看板 / 我的档案 / 系统设置 / 痕迹日志 / 操作日志 / 评优评先 / 举报中心；
+     业务模块（档案/服务/审核/活动/任务/新闻/通知/部门独立）由校团委/超级管理员操作 */
+  if(isTerminal() && !['dashboard','my','settings','traces','logs','eval','report'].includes(route)) return false;
   return false;
 }
 
@@ -766,6 +770,28 @@ function renderDashboard(root){
   root.innerHTML=`
     <div class="notice-strip"><span class="label">系统公告</span><span class="ct">欢迎进入 <b>宣汉职校志愿服务智慧管理平台</b>；今日 ${fmtDate(now())} · ${esc(DB.period)} · ${esc(DB.school)}</span><span class="time">单机版 · 即开即用</span></div>
     <div class="stat-row">${stats.map(s=>`<div class="stat-card"><div class="stat-icon ${s.cls}">${s.icon}</div><div class="stat-meta"><div class="stat-label">${esc(s.label)}</div><div class="stat-value">${s.value}<span class="unit">${esc(s.unit)}</span></div><div class="stat-sub">${esc(s.sub)}</div></div></div>`).join('')}</div>
+    <div class="page-block" id="carouselBlock">${blockHead('志愿风采 · 校园巡礼','')}<div class="block-body" style="padding:0;">
+      <div class="hero-carousel" id="heroCarousel">
+        <div class="hc-track" id="hcTrack">
+          <div class="hc-slide" data-i="1"><img src="carousel/carousel-1.jpg" alt="志愿风采 1"></div>
+          <div class="hc-slide" data-i="2"><img src="carousel/carousel-2.jpg" alt="志愿风采 2"></div>
+          <div class="hc-slide" data-i="3"><img src="carousel/carousel-3.jpg" alt="志愿风采 3"></div>
+          <div class="hc-slide" data-i="4"><img src="carousel/carousel-4.jpg" alt="志愿风采 4"></div>
+          <div class="hc-slide" data-i="5"><img src="carousel/carousel-5.jpg" alt="志愿风采 5"></div>
+          <div class="hc-slide" data-i="6"><img src="carousel/carousel-6.jpg" alt="志愿风采 6"></div>
+          <div class="hc-slide" data-i="7"><img src="carousel/carousel-7.jpg" alt="志愿风采 7"></div>
+          <div class="hc-slide" data-i="8"><img src="carousel/carousel-8.jpg" alt="志愿风采 8"></div>
+          <div class="hc-slide" data-i="9"><img src="carousel/carousel-9.jpg" alt="志愿风采 9"></div>
+          <div class="hc-slide" data-i="10"><img src="carousel/carousel-10.jpg" alt="志愿风采 10"></div>
+          <div class="hc-slide" data-i="11"><img src="carousel/carousel-11.jpg" alt="志愿风采 11"></div>
+          <div class="hc-slide" data-i="12"><img src="carousel/carousel-12.jpg" alt="志愿风采 12"></div>
+        </div>
+        <div class="hc-caption" id="hcCaption">志愿风采 · 校园巡礼</div>
+        <div class="hc-dots" id="hcDots"></div>
+        <button class="hc-prev" id="hcPrev" aria-label="上一张">‹</button>
+        <button class="hc-next" id="hcNext" aria-label="下一张">›</button>
+      </div>
+    </div></div>
     <div class="page-block">${blockHead('活动剪影',`<button onclick="goto('activities')">更多活动</button>`)}
       <div class="block-body">${actSnap.length?`<div class="snap-grid">${actSnap.map(a=>a.covers&&a.covers[0]&&a.covers[0].dataUrl?`<div class="snap-item" onclick="viewImg('${a.covers[0].dataUrl}')" title="${esc(a.title)}"><img src="${a.covers[0].dataUrl}"><span class="snap-cap">${esc(a.title)}</span></div>`:`<div class="snap-item snap-text" onclick="goto('activities')" title="${esc(a.title)}">${esc(a.title)}</div>`).join('')}</div>`:'<div class="empty-tip">暂无活动剪影，请在活动中心发布活动并上传封面</div>'}</div>
     </div>
@@ -784,6 +810,51 @@ function renderDashboard(root){
     <div class="page-block">${blockHead('站内通知（未读）',`<button onclick="$('#notifyDrawer').hidden=false;renderNotifyList('unread')">查看全部</button>`)}<div class="block-body" id="dashNotify"></div></div>
     ${logSection}`;
   drawChartDept();drawChartPol();drawChartGen();renderRankTrapezoid();renderDashNews(pinned,recentNews);renderDashNotify();
+  initHeroCarousel();
+}
+
+/* ============================== 首页轮播图（12 张图一致随机播放） ============================== */
+let _hcTimer=null, _hcOrder=[], _hcIdx=0;
+function initHeroCarousel(){
+  const track=$('#hcTrack'); if(!track) return;
+  const slides=track.querySelectorAll('.hc-slide');
+  const N=slides.length;
+  if(!N) return;
+  /* 一致随机：先按固定会话级种子排序，每次启动顺序一致（不闪烁），但同会话内轮转 */
+  _hcOrder=Array.from({length:N},(_,i)=>i);
+  for(let i=N-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [_hcOrder[i],_hcOrder[j]]=[_hcOrder[j],_hcOrder[i]]; }
+  _hcIdx=0;
+  /* 生成圆点 */
+  const dots=$('#hcDots'); if(dots){
+    dots.innerHTML=_hcOrder.map((_,i)=>`<span class="hc-dot ${i===0?'active':''}" data-d="${i}"></span>`).join('');
+    dots.querySelectorAll('.hc-dot').forEach(d=>d.onclick=()=>{_hcIdx=parseInt(d.dataset.d);updateSlide();resetTimer();});
+  }
+  /* 上一张 / 下一张 */
+  const prev=$('#hcPrev'), next=$('#hcNext');
+  if(prev) prev.onclick=()=>{_hcIdx=(_hcIdx-1+_hcOrder.length)%_hcOrder.length;updateSlide();resetTimer();};
+  if(next) next.onclick=()=>{_hcIdx=(_hcIdx+1)%_hcOrder.length;updateSlide();resetTimer();};
+  /* 鼠标悬停暂停 */
+  const box=$('#heroCarousel');
+  if(box){ box.onmouseenter=()=>{if(_hcTimer)clearInterval(_hcTimer);_hcTimer=null;}; box.onmouseleave=()=>resetTimer(); }
+  updateSlide();
+  resetTimer();
+}
+function updateSlide(){
+  const track=$('#hcTrack'); if(!track) return;
+  const offset=-_hcIdx*100;
+  track.style.transform=`translateX(${offset}%)`;
+  /* 更新圆点 */
+  document.querySelectorAll('.hc-dot').forEach((d,i)=>d.classList.toggle('active',i===_hcIdx));
+  /* 简单图文描述（标题） */
+  const cap=$('#hcCaption'); if(cap){
+    const order=(_hcOrder[_hcIdx]||0)+1;
+    const titles=['红心志愿 · 传递温暖','守护图书 · 知识润心','红色血脉 · 薪火相传','誓言铿锵 · 青春向党','社区服务 · 敬老助老','五四诵唱 · 志愿护航','雷锋精神 · 时代相传','青年先锋 · 团徽闪耀','校园文化 · 绿树成荫','桃李芬芳 · 立德树人','绿叶行动 · 守护家园','入团誓词 · 永葆初心'];
+    cap.textContent='【'+order+'/12】'+titles[_hcOrder[_hcIdx]||0];
+  }
+}
+function resetTimer(){
+  if(_hcTimer) clearInterval(_hcTimer);
+  _hcTimer=setInterval(()=>{_hcIdx=(_hcIdx+1)%_hcOrder.length; updateSlide();}, 4500);
 }
 
 function renderRankTrapezoid(){
