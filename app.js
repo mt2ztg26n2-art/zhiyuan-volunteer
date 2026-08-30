@@ -152,6 +152,7 @@ function normalizeDB(db){
   if(!db.quotas) db.quotas=[];
   if(!db.nextIds) db.nextIds={};
   /* 演示数据不再自动注入（用户要求纯净系统，自己录入真实数据） */
+  const seed=seedDB();
   // 字典增量合并：保留用户已有数据，向 organizations/positions/classes 追加新条目（不覆盖）
   const orgs=new Set([...(db.dictionaries.organizations||[]),...(seed.dictionaries.organizations||[])]);
   db.dictionaries.organizations=[...orgs];
