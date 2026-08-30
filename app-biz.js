@@ -48,7 +48,7 @@ window.openServiceForm=function(existing){
   openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>${isEdit?'编辑服务':'录入服务'}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid cols-2">
     <label>活动名称<i>*</i><input id="sfAct" value="${esc(s?.activity||'')}" placeholder="如：五四诵唱比赛志愿服务"></label>
     <label>专业部<select id="sfDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${s?.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级（文本直接输入）<input id="sfCls" value="${esc(s?.cls||'')}" placeholder="如：24级会计1班（可直接输新班级，无需预建）"></label>
+    <label>班级（文本直接输入）<input id="sfCls" value="${esc(s?.cls||'')}" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label>姓名<i>*</i><input id="sfName" value="${esc(s?.name||'')}" placeholder="参与人姓名"></label>
     <label>身份证号<input id="sfIdCard" maxlength="18" value="${esc(s?.idCard||'')}" placeholder="选填，用于档案关联"></label>
     <label>天数（自定义）<input id="sfDays" type="number" value="${s?.days||1}" min="1"></label>
@@ -396,7 +396,7 @@ window.actSignup=(id)=>{
     <label>姓名<i>*</i><input id="sgName" value="${esc(currentUser.name)}"></label>
     <label>身份证号<i>*</i><input id="sgId" value="${esc(currentUser.idCard)}" maxlength="18"></label>
     <label>专业部<select id="sgDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="sgCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="sgCls" value="${esc(currentUser.cls||'')}" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label class="full">联系电话<input id="sgPhone" value="${esc(currentUser.phone||'')}"></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="sgSubmit">提交报名</button></div></div>`);
   $('#sgSubmit').onclick=()=>{
@@ -417,7 +417,7 @@ window.actCheckin=(id)=>{
     <label>姓名<i>*</i><input id="ckName" value="${esc(currentUser.name)}"></label>
     <label>身份证号<i>*</i><input id="ckId" value="${esc(currentUser.idCard)}" maxlength="18"></label>
     <label>专业部<select id="ckDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="ckCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="ckCls" value="${esc(currentUser.cls||'')}" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label class="full">签到位置<input id="ckLoc" placeholder="如：校体育馆"></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="ckSubmit">确认签到</button></div></div>`);
   $('#ckSubmit').onclick=()=>{
@@ -480,7 +480,7 @@ window.taskSignup=(id)=>{
   openModal(`<div class="modal" style="width:440px;"><div class="modal-title"><span class="bar"></span>任务报名 · ${esc(t.title)}<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body"><div class="form-grid">
     <label>姓名<i>*</i><input id="tkName" value="${esc(currentUser.name)}"></label>
     <label>专业部<select id="tkDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="tkCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="tkCls" value="${esc(currentUser.cls||'')}" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label>联系电话<input id="tkPhone" value="${esc(currentUser.phone||'')}"></label>
     <label class="full">报名说明<textarea id="tkNote"></textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="tkSubmit">提交报名</button></div></div>`);
@@ -505,7 +505,7 @@ window.taskCheckin=(id)=>{
     <label>姓名<i>*</i><input id="tkCkName" value="${esc(currentUser.name)}"></label>
     <label>身份证号<i>*</i><input id="tkCkId" value="${esc(currentUser.idCard)}" maxlength="18"></label>
     <label>专业部<select id="tkCkDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${currentUser.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="tkCkCls" value="${esc(currentUser.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="tkCkCls" value="${esc(currentUser.cls||'')}" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label class="full">签到位置<input id="tkCkLoc" placeholder="如：校团委办公室"></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="tkCkSubmit">确认签到</button></div></div>`);
   $('#tkCkSubmit').onclick=()=>{
@@ -1378,7 +1378,7 @@ window.openQuotaForm=function(){
     <label>申请类型<select id="qKind">${isMember?'<option>个人自荐</option>':'<option>组织推荐</option><option>个人自荐</option><option>团支部推优</option>'}</select></label>
     <label>推荐人选<input id="qName" placeholder="被推荐人姓名"></label>
     <label>专业部<select id="qDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="qCls" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="qCls" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label class="full">推荐 / 申请事由<textarea id="qReason" placeholder="说明该人选的志愿服务表现与推优理由"></textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="qSave">提交</button></div></div>`);
   $('#qSave').onclick=()=>{const name=$('#qName').value.trim();if(!name)return toast('请填写推荐人选','err');const o={id:uid('q'),name,dept:$('#qDept').value,cls:$('#qCls').value,kind:$('#qKind').value,reason:$('#qReason').value.trim(),status:'recommend',createdAt:now(),trace:[{act:'提交推荐',st:'recommend',time:now(),by:currentUser.name}]};

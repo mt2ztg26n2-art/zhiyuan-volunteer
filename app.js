@@ -530,7 +530,7 @@ function openRegister(){
     <label>宗教信仰<select id="rReligion">${(DB.dictionaries.religion||[]).map(n=>`<option>${n}</option>`).join('')}</select></label>
     <label>所在学校<input id="rSchool" value="${esc(DB.school)}"></label>
     <label>专业部<select id="rDept"><option value="">请选择</option>${(DB.dictionaries.departments||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="rCls" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="rCls" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label>所在部门<select id="rOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option>${d}</option>`).join('')}</select></label>
     <label>职位/类型<select id="rType"><option>青年志愿者</option><option>广播站成员</option><option>礼仪队成员</option><option>团总支成员</option></select></label>
     <label>登录密码<i>*</i><input id="rPwd" type="password"></label>
@@ -942,7 +942,7 @@ window.openUserForm=function(existing){
     <label>政治面貌<select id="ufPolitics">${(DB.dictionaries.politics||[]).map(n=>`<option ${u?.politics===n?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>宗教信仰<select id="ufReligion">${(DB.dictionaries.religion||[]).map(n=>`<option ${u?.religion===n?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>专业部<select id="ufDept"><option value="">-</option>${(DB.dictionaries.departments||[]).map(d=>`<option ${u?.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label>班级<input id="ufCls" value="${esc(u?.cls||'')}" placeholder="如：24级会计1班（直接输入）"></label>
+    <label>班级<input id="ufCls" value="${esc(u?.cls||'')}" placeholder="如：2024级计算机5班（格式：XXXX级专业XX班）"></label>
     <label>所在部门<i>*</i><select id="ufOrg">${(DB.dictionaries.organizations||[]).map(d=>`<option ${(u?.org||initOrg)===d?'selected':''}>${d}</option>`).join('')}</select></label>
     <label>职位 / 类型<i>*</i><select id="ufTitle" data-datalist="ufTitleList"></select><datalist id="ufTitleList"></datalist></label>
     <label>邮箱<input id="ufEmail" value="${esc(u?.email||'')}"></label>
