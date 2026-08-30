@@ -105,7 +105,11 @@ window.ZY = (function(){
         const remoteTs = new Date(j[0].updated_at).getTime();
         if(remoteTs > lastSync + 2500){
           const p = await pull();
-          if(p.ok && p.data && !p.empty){
+          /* 防空覆盖：远端是空库（无用户无业务）而本机有数据 → 不拉取，回推本机恢复云端 */
+          if(p.ok && p.data && !p.empty && isCloudEmpty(p.data) && hasLocalData()){
+            await push();
+          }
+          else if(p.ok && p.data && !p.empty){
             try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}
             const backup = window.DB;
             window.DB = p.data;
@@ -124,12 +128,24 @@ window.ZY = (function(){
   }
   function stopPoll(){ if(timer){ clearInterval(timer); timer=null; } }
 
-  /* ---------- 首次接入：云端空则上传本地；云端有则拉取覆盖（备份） ---------- */
+  /* ---------- 数据有效性判断（防空数据覆盖） ---------- */
+  function hasLocalData(){
+    const db=window.DB; return !!db && ((db.users||[]).length>0 || (db.services||[]).length>0 || (db.activities||[]).length>0);
+  }
+  function isCloudEmpty(d){
+    return !d || (!(d.users||[]).length && !(d.services||[]).length && !(d.activities||[]).length);
+  }
+
+  /* ---------- 首次接入：云端空/空库 且 本地有数据 → 以本地为准上传；
+     云端有实质数据 → 拉取覆盖（备份）；本地空且云端空 → 保持空（防空设备覆盖竞态） ---------- */
   async function bootstrap(){
     const p = await pull();
-    if(p.ok && (p.empty || !p.data)){
-      const pu = await push();
-      return pu;
+    if(p.ok && (p.empty || !p.data || isCloudEmpty(p.data))){
+      if(hasLocalData()){
+        const pu = await push();
+        return pu;
+      }
+      return {ok:true, empty:true}; /* 本地也空：不推不拉，保持云端空，等待首个有数据的设备初始化 */
     }
     if(p.ok && p.data){
       try{ localStorage.setItem(LS_BACK, JSON.stringify(window.DB)); }catch(e){}

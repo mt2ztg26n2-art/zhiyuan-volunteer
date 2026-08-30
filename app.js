@@ -203,11 +203,11 @@ function loadDB(){
 function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }catch(e){ toast('数据保存失败，请检查浏览器存储空间','err'); } if(window.ZY && DB && !window._zyPushing) try{ ZY.markDirty(); }catch(e){} }
 function resetDB(){
   if(!confirm('确定清除所有数据并恢复初始演示数据吗？该操作不可恢复，请先导出 Excel 备份！')) return;
-  /* 云端同步清空（防止其它设备把旧数据又拉回来） */
+  /* 云端写入"重置标记"（防止其它设备把空/旧数据推上来；首个有数据的设备会自动重新初始化云端） */
   try{
     if(window.ZY){
       const c=ZY.cfg;
-      fetch(c.url+'/rest/v1/zy_db?id=eq.1',{method:'PATCH',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({data:{}})});
+      fetch(c.url+'/rest/v1/zy_db?id=eq.1',{method:'PATCH',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({data:{__reset:1}})});
       fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}});
       fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:{'apikey':c.key,'Authorization':'Bearer '+c.key}});
     }
