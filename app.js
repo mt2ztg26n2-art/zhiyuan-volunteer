@@ -548,7 +548,8 @@ function doRegister(){
   if(!name)return toast('请填写姓名','err');
   if(pwd.length<6)return toast('密码至少 6 位','err');
   if(pwd!==pwd2)return toast('两次密码输入不一致','err');
-  if(DB.users.some(u=>u.idCard===id))return toast('该身份证号已注册','err');
+  const existUser=DB.users.find(u=>u.idCard===id);
+  if(existUser) return toast(existUser.pending?'该身份证号已提交注册，正在审核中':'该身份证号已注册','err');
   const photo=$('#rPhoto').files[0];
   const finish=(avatar)=>{
     const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
@@ -792,6 +793,8 @@ function renderFiles(root){
   $$('.file-tab').forEach(a=>a.onclick=()=>{_curFileOrg=a.dataset.fileOrg;renderFiles($('#viewRoot'))});
   filesSearch();
   $('#fDept').onchange=()=>{const list=(DB.dictionaries.classes[$('#fDept').value]||[]);$('#fCls').innerHTML='<option value="">全部</option>'+list.map(c=>`<option>${c}</option>`).join('')};
+  /* 档案中心也自动同步云端注册（手机端提交的注册，电脑端档案中心/审核中心都能看到） */
+  if(window.zySyncRegs){ try{ zySyncRegs(true); }catch(e){} }
 }
 function filesReset(){$('#fKw').value='';$('#fGrade').value='';$('#fDept').value='';$('#fCls').innerHTML='<option value="">全部</option>';$('#fStatus').value='';filesSearch()}
 function filesSearch(){

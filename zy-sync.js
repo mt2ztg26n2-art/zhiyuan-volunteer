@@ -112,6 +112,7 @@ window.ZY = (function(){
             if(window.normalizeDB) window.normalizeDB();
             if(window.saveDB) window.saveDB();
             if(window.renderRoute) window.renderRoute();
+            if(window.updateNotifyBadge) window.updateNotifyBadge();
             if(window.toast) window.toast('已同步云端最新数据','ok');
             if(window._cloudMergeCb) window._cloudMergeCb(p.data, backup);
           }

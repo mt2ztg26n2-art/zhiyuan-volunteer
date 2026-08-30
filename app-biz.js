@@ -210,16 +210,25 @@ window.zySyncRegs=async function(silent){
     if(!window.ZYReg) return;
     const res=await ZYReg.listAll();
     if(!res.ok){ if(!silent) toast('云端注册拉取失败：'+(res.msg||''),'err'); return; }
-    let added=0;
+    let added=0, first='';
     (res.list||[]).forEach(r=>{
       const d=r.data||{};
       if(!d.idCard||!d.name) return;
       if(DB.users.some(u=>u.idCard===d.idCard)) return; // 已存在（含已处理）跳过
       const next=(DB.nextIds.user=(DB.nextIds.user||0)+1);
       DB.users.push({id:'u-'+next,idCard:d.idCard,pwd:'',role:'member',org:d.org||'青年志愿者协会',name:d.name,gender:d.gender||'',birth:d.birth||'',nation:d.nation||'',politics:d.politics||'',religion:d.religion||'',school:d.school||'',dept:d.dept||'',cls:d.cls||'',grade:(window.deriveGrade?deriveGrade(d.cls):'')||'',phone:d.phone||'',email:d.email||'',qq:d.qq||'',wechat:d.wechat||'',native:d.native||'',addr:d.addr||'',title:d.title||'青年志愿者',avatar:d.avatar||'',exp:d.exp||'',position:'志愿者',activated:false,pending:true,createdAt:d.createdAt||now(),_cloudRegId:r.id});
-      added++;
+      added++; if(!first) first=d.name;
     });
-    if(added){ saveDB(); if(window.renderAuditPending) renderAuditPending(); if(!silent) toast('已同步 '+added+' 条云端注册','ok'); }
+    if(added){
+      saveDB();
+      /* 通知红点 + 审核/档案界面实时联动 */
+      if(window.pushNotify) pushNotify({to:'超级管理员',kind:'audit',title:'新注册待审核',content:(first||'有学员')+' 提交注册申请，请到审核中心处理'});
+      if(window.updateNotifyBadge) updateNotifyBadge();
+      const rt=window.currentRoute?currentRoute():'';
+      if(rt==='audit'&&window.renderAudit&&$('#viewRoot')) renderAudit($('#viewRoot'));
+      else if(rt==='files'&&window.filesSearch) filesSearch();
+      if(!silent) toast('已同步 '+added+' 条云端注册','ok');
+    }
     else if(!silent) toast('云端无新注册','ok');
   }catch(e){ if(!silent) toast('云端注册同步异常：'+e.message,'err'); }
 };
