@@ -156,8 +156,11 @@ async function resetDB(){
     if(window.ZY){
       const p=await ZY.push(); if(p&&!p.ok) toast('本地已清空，但云端同步失败：'+(p.msg||'')+'，请检查网络后重试','err');
       const c=ZY.cfg, h={'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json'};
+      /* v19.15：硬清空云端全部数据（含主库行），再带墓碑重建 id=1 */
+      await fetch(c.url+'/rest/v1/zy_db?id=not.is.null',{method:'DELETE',headers:h});
       await fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:h});
       await fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:h});
+      const p2=await ZY.push(); if(p2&&!p2.ok) toast('云端重建失败：'+(p2.msg||'')+'，请重试','err');
     }
   }catch(e){}
   localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_USR); location.reload();
@@ -636,6 +639,14 @@ function openRegister(){
   $('#registerModal').hidden=false;
 }
 
+/* v19.15：判断一条 pending 注册是否为"幽灵残留"（清除数据后遗留/超过 24 小时的旧副本）。
+ * 只有最近 24 小时内提交的 pending 才算是真实的"正在审核中"，其余一律放行重新注册。 */
+function isStalePending(u){
+  if(!u) return true;
+  const t=Date.parse(String(u.createdAt||u.updatedAt||''));
+  if(!t) return true;            // 无时间戳的旧数据 → 视为幽灵
+  return (Date.now()-t) > 24*3600*1000;
+}
 async function doRegister(){
   const id=$('#rIdCard').value.trim(),name=$('#rName').value.trim(),pwd=$('#rPwd').value,pwd2=$('#rPwd2').value;
   if(!isIDCard(id))return toast('身份证号格式不正确','err');
@@ -646,18 +657,25 @@ async function doRegister(){
   if(!org)return toast('请选择所在部门','err');
   const existUser=DB.users.find(u=>u.idCard===id);
   if(existUser){
-    /* 拉云端确认真实状态：本机残留的 pending 可能是已审核通过的旧副本，避免误报「审核中」 */
+    /* v19.15 根治「身份证号在审核中」拦注册：
+     * 云端可能已清除（本机/旧缓存残留旧 pending 副本），不能再一见到 pending 就拦。
+     * 规则：只有「云端存在 已激活成员」或「最近 24 小时内刚提交的 pending」才拦；
+     * 被清除过的（云端有该身份证墓碑）或超过 24 小时的旧 pending = 幽灵残留，自动释放允许重新注册。 */
+    let cu=null, cloudTomb=false;
     if(window.ZY && ZY.pull){
       try{
         const p=await ZY.pull(true);
-        if(p.ok && p.data && Array.isArray(p.data.users)){
-          const cu=p.data.users.find(x=>x.idCard===id);
-          if(cu && cu.activated===true) return toast('该身份证号已审核通过，请使用原密码直接登录','err');
-          if(cu && cu.pending) return toast('该身份证号已提交注册，正在审核中','err');
-        }
+        if(p.ok && p.data && Array.isArray(p.data.users)){ cu=p.data.users.find(x=>x.idCard===id)||null; }
+        if(p.ok && p.data && p.data._tomb && p.data._tomb['users:'+id]) cloudTomb=true;
       }catch(e){}
     }
-    return toast(existUser.pending?'该身份证号已提交注册，正在审核中':'该身份证号已注册','err');
+    const real=cu||existUser;
+    if(real && real.activated===true) return toast('该身份证号已审核通过，请使用原密码直接登录','err');
+    const ghost = cloudTomb || isStalePending(real);
+    if(real && real.pending && !ghost) return toast('该身份证号已提交注册，正在审核中','err');
+    /* 幽灵残留：解除本地/云端墓碑与旧记录，允许重新注册（新注册会按 idCard 合并替换旧记录） */
+    try{ if(window.ZY && ZY.untombPush) await ZY.untombPush(['users:'+id]); }catch(e){}
+    if(DB.users.some(x=>x.idCard===id)){ DB.users=DB.users.filter(x=>x.idCard!==id); saveDB(); }
   }
   const photo=$('#rPhoto').files[0];
   const finish=async (avatar)=>{

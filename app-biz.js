@@ -1466,13 +1466,18 @@ window.clearAllDemo=async function(){
   saveDB();
   /* 关键修复：必须等待云端上传完成再返回，否则退出登录/刷新会把"清空"打断，
      云端仍是旧演示数据，重新登录又被同步回来，演示数据"死灰复燃"。
-     同时清空注册队列 zy_regs 与审核状态 zy_status，释放被占用的身份证 */
+     v19.15：上传后把云端 zy_db 全部行也硬删除（用户要求"清除数据时云端数据也清除"），
+     再带墓碑重建 id=1 —— 墓碑保留在云端，其他设备残留旧数据也不会被推回来。 */
   try{
     if(window.ZY){
       const p=await ZY.push(); if(p&&!p.ok) toast('本地已清空，但云端同步失败：'+(p.msg||'')+'，请检查网络后重试','err');
       const c=ZY.cfg, h={'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json'};
+      /* 硬清空云端全部数据（含主库行） */
+      await fetch(c.url+'/rest/v1/zy_db?id=not.is.null',{method:'DELETE',headers:h});
       await fetch(c.url+'/rest/v1/zy_regs?id=not.is.null',{method:'DELETE',headers:h});
       await fetch(c.url+'/rest/v1/zy_status?id_card=not.is.null',{method:'DELETE',headers:h});
+      /* 带墓碑的干净库重建云端 id=1（防其他设备把旧数据推回来） */
+      const p2=await ZY.push(); if(p2&&!p2.ok) toast('云端重建失败：'+(p2.msg||'')+'，请重试','err');
     }
   }catch(e){}
   if(window.renderRoute) renderRoute();

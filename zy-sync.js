@@ -290,24 +290,34 @@ window.ZY = (function(){
    * 这里：把本地/云端副本中的指定墓碑键都剔除后再合并上传（必须在 mergeDB 之前剔除，
    * 否则 mergeTombs 会把云端墓碑并回来，新记录在合并阶段就被过滤掉）。 */
   async function untombPush(keys){
+    /* 先移除本机墓碑并持久化——否则后续任何 push 的合并都会把本地墓碑重新并回云端，
+       新注册/新数据又被过滤（用户反复遇到的"清除后身份证还在审核中"根因之一） */
     try{
-      const p=await pullRaw();
-      if(!p.ok) return {ok:false, msg:p.msg||'拉取失败'};
-      const base=(p.ok&&!p.empty&&p.data)?p.data:{};
-      const localDB=window.DB||{};
-      const strip=o=>{ const c=JSON.parse(JSON.stringify(o||{})); if(c&&c._tomb){ (keys||[]).forEach(k=>{ if(k) delete c._tomb[k]; }); } return c; };
-      const merged=mergeDB(strip(localDB), strip(base));
-      if(!merged._tomb) merged._tomb={};
-      (keys||[]).forEach(k=>{ if(k) delete merged._tomb[k]; });
-      const enc=await encrypt(merged);
-      const prevTs=(p.tsRaw!=null)?p.tsRaw:null;
-      const res=(prevTs!=null)?await httpPatch(prevTs,enc):await httpPost({id:1,data:enc});
-      if(res.ok && res.rows.length){
-        lastRemoteTs=tsOf(res.rows[res.rows.length-1]); saveLast(); setState('ok');
-        return {ok:true};
-      }
-      return {ok:false, msg:'并发冲突，请重试'};
-    }catch(e){ return {ok:false, msg:e.message}; }
+      if(window.DB){ if(!window.DB._tomb) window.DB._tomb={}; (keys||[]).forEach(k=>{ if(k) delete window.DB._tomb[k]; }); if(window.saveDB) window.saveDB(); }
+    }catch(e){}
+    let attempt=0;
+    while(attempt<8){   // CAS 竞争（如后台自动 flush）时自动重试，绝不静默失败
+      attempt++;
+      try{
+        const p=await pullRaw();
+        if(!p.ok){ await backoff(attempt); continue; }
+        const base=(p.ok&&!p.empty&&p.data)?p.data:{};
+        const localDB=window.DB||{};
+        const strip=o=>{ const c=JSON.parse(JSON.stringify(o||{})); if(c&&c._tomb){ (keys||[]).forEach(k=>{ if(k) delete c._tomb[k]; }); } return c; };
+        const merged=mergeDB(strip(localDB), strip(base));
+        if(!merged._tomb) merged._tomb={};
+        (keys||[]).forEach(k=>{ if(k) delete merged._tomb[k]; });
+        const enc=await encrypt(merged);
+        const prevTs=(p.tsRaw!=null)?p.tsRaw:null;
+        const res=(prevTs!=null)?await httpPatch(prevTs,enc):await httpPost({id:1,data:enc});
+        if(res.ok && res.rows.length){
+          lastRemoteTs=tsOf(res.rows[res.rows.length-1]); saveLast(); setState('ok');
+          return {ok:true};
+        }
+        await backoff(attempt);   // CAS 未命中 → 重读重合并重写
+      }catch(e){ await backoff(attempt); }
+    }
+    return {ok:false, msg:'解除墓碑失败（多次重试仍冲突），请稍后重试'};
   }
   function tombMany(type, keys){
     if(!window.DB) return;
