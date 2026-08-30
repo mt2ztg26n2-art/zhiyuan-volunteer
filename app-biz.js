@@ -240,8 +240,8 @@ function renderAuditQuota(){
   if(!qs.length){t.innerHTML='<div class="empty-tip">暂无待审名额申请，提交申请后会自动出现在这里</div>';return}
   t.innerHTML=qs.map(q=>`<div style="padding:12px 14px;background:#fff;margin-bottom:10px;border-radius:2px;"><div style="display:flex;justify-content:space-between;"><b>${esc(q.name)}</b><span class="tag ${q.status==='review'?'':'warn'}">${q.status==='review'?'待审核':'待送审'}</span></div><div class="f12 c-3 mt-8">${esc(q.kind||'推荐')} · ${esc(q.dept||'-')} / ${esc(q.cls||'-')} · 提交 ${esc(fmtDateTime(q.createdAt))}</div><div class="f12 c-3">事由：${esc(q.reason||'-')}</div>${(q.trace||[]).length?`<div class="trace mt-8">${q.trace.map(t=>`<span class="trace-dot ${t.st}"></span>${esc(t.act)}·${esc((t.time||'').slice(5,16))}`).join(' ')}</div>`:''}<div class="mt-8" style="display:flex;gap:6px;">${q.status==='recommend'?`<button style="height:28px;padding:0 14px;" onclick="quotaSubmit('${q.id}')">送审</button>`:''}<button class="primary" style="height:28px;padding:0 14px;" onclick="quotaApprove('${q.id}')">通过</button><button class="warn" style="height:28px;padding:0 14px;" onclick="quotaReject('${q.id}')">驳回</button></div></div>`).join('');
 }
-window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){const before={pending:!!u.pending,activated:!!u.activated,status:u.status};u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');pushTrace('审核通过','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:true,status:u.status});/* 云端：写入审核状态 + 删除已处理注册条目 */if(window.ZYStatus)ZYStatus.set(u.idCard,'approved');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已审核通过','ok')}};
-window.auditRejectUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认驳回 <b>${esc(u.name)}</b> 的注册申请？`,()=>{const before={pending:!!u.pending,activated:!!u.activated};u.pending=false;u.activated=false;saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核驳回',content:`${u.name}，您的注册申请未通过审核，请联系团委管理员。`});pushLog('审核','驳回 '+u.name+' 的注册');pushTrace('审核驳回','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:false});if(window.ZYStatus)ZYStatus.set(u.idCard,'rejected');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);renderAuditPending();toast('已驳回','ok')},'驳回注册')};
+window.auditApprove=(id)=>{const u=DB.users.find(x=>x.id===id);if(u){const before={pending:!!u.pending,activated:!!u.activated,status:u.status};u.activated=true;u.pending=false;u.status=u.status||'正常在岗';saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核通过',content:`${u.name}，您的志愿者注册已通过审核，现在可以使用账号登录。`});pushLog('审核','通过 '+u.name+' 的注册');pushTrace('审核通过','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:true,status:u.status});/* 云端：写入审核状态 + 删除已处理注册条目 */if(window.ZYStatus)ZYStatus.set(u.idCard,'approved');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);if(window.ZY)ZY.push();renderAuditPending();toast('已审核通过','ok')}};
+window.auditRejectUser=(id)=>{const u=DB.users.find(x=>x.id===id);if(!u)return;confirmDialog(`确认驳回 <b>${esc(u.name)}</b> 的注册申请？`,()=>{const before={pending:!!u.pending,activated:!!u.activated};u.pending=false;u.activated=false;saveDB();pushNotify({to:u.name,kind:'sys',title:'注册审核驳回',content:`${u.name}，您的注册申请未通过审核，请联系团委管理员。`});pushLog('审核','驳回 '+u.name+' 的注册');pushTrace('审核驳回','注册: '+u.name+' ('+u.idCard+')',before,{pending:false,activated:false});if(window.ZYStatus)ZYStatus.set(u.idCard,'rejected');if(window.ZYReg&&u._cloudRegId)ZYReg.remove(u._cloudRegId);if(window.ZY)ZY.push();renderAuditPending();toast('已驳回','ok')},'驳回注册')};
 window.auditQuery=()=>{
   const id=$('#adId').value.trim(),name=$('#adName').value.trim();
   if(!id||!name)return toast('请同时输入身份证号和姓名','err');
@@ -310,7 +310,7 @@ window.openActivityForm=function(existing){
     const o={title,startDT:start,endDT:end,location:loc,organizer:$('#afOrg').value,need:parseInt($('#afNeed').value)||0,intro:$('#afIntro').value,signin:{start:$('#afSgStart').value,end:$('#afSgEnd').value}};
     if(window._afCovers&&window._afCovers.length)o.covers=window._afCovers;
     if(isEdit)Object.assign(a,o);else DB.activities.unshift(Object.assign({id:uid('a'),status:'open',signups:[],createdBy:currentUser.name,createdAt:now()},o));
-    saveDB();closeModal();if(currentRoute()==='activities')renderActivities($('#viewRoot'));toast('已发布','ok');
+    pushNotify({to:'all',kind:'act',title:'新活动发布',content:`《${title}》已发布，请在「活动中心」报名`});saveDB();if(window.ZY)ZY.push();closeModal();if(currentRoute()==='activities')renderActivities($('#viewRoot'));toast('已发布','ok');
   };
 };
 window.delActivity=(id)=>confirmDialog('确认删除该活动？',()=>{DB.activities=DB.activities.filter(a=>a.id!==id);saveDB();renderActivities($('#viewRoot'));toast('已删除','ok')});
@@ -408,7 +408,7 @@ window.actSignup=(id)=>{
     pushNotify({to:'会 长',kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
     pushNotify({to:'副 会 长',kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
     pushNotify({to:'超级管理员',kind:'act',title:'活动报名',content:`${name} 报名了《${a.title}》`});
-    saveDB();closeModal();renderActivities($('#viewRoot'));toast('报名成功','ok');
+    saveDB();if(window.ZY)ZY.push();closeModal();renderActivities($('#viewRoot'));toast('报名成功','ok');
   };
 };
 window.actCheckin=(id)=>{
@@ -470,7 +470,7 @@ window.openTaskForm=function(existing){
     if(!title||!start||!end)return toast('请填写完整','err');
     const o={title,type:$('#tfType').value,publisher:$('#tfPub').value,startDT:start,endDT:end,intro:$('#tfIntro').value,signin:{start:$('#tfSgStart').value,end:$('#tfSgEnd').value}};
     if(isEdit)Object.assign(t,o);else DB.tasks.unshift(Object.assign({id:uid('t'),status:'open',reads:[],signups:[],createdAt:now()},o));
-    saveDB();closeModal();if(currentRoute()==='tasks')renderTasks($('#viewRoot'));toast('已发布','ok');
+    pushNotify({to:'all',kind:'task',title:'新任务发布',content:`《${title}》已发布，请在「任务中心」查看`});saveDB();if(window.ZY)ZY.push();closeModal();if(currentRoute()==='tasks')renderTasks($('#viewRoot'));toast('已发布','ok');
   };
 };
 window.delTask=(id)=>confirmDialog('确认删除该任务？',()=>{DB.tasks=DB.tasks.filter(t=>t.id!==id);saveDB();renderTasks($('#viewRoot'));toast('已删除','ok')});
@@ -492,7 +492,7 @@ window.taskSignup=(id)=>{
     pushNotify({to:'会 长',kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
     pushNotify({to:'副 会 长',kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
     pushNotify({to:'超级管理员',kind:'task',title:'任务报名',content:`${name} 报名了《${t.title}》`});
-    saveDB();closeModal();renderTasks($('#viewRoot'));toast('报名成功，已同步至会长/副会长/超管','ok');
+    saveDB();if(window.ZY)ZY.push();closeModal();renderTasks($('#viewRoot'));toast('报名成功，已同步至会长/副会长/超管','ok');
   };
 };
 window.taskCheckin=(id)=>{
@@ -1383,11 +1383,11 @@ window.openQuotaForm=function(){
     <label class="full">推荐 / 申请事由<textarea id="qReason" placeholder="说明该人选的志愿服务表现与推优理由"></textarea></label>
   </div></div><div class="modal-foot"><button class="ghost" data-close-modal>取消</button><button class="primary" id="qSave">提交</button></div></div>`);
   $('#qSave').onclick=()=>{const name=$('#qName').value.trim();if(!name)return toast('请填写推荐人选','err');const o={id:uid('q'),name,dept:$('#qDept').value,cls:$('#qCls').value,kind:$('#qKind').value,reason:$('#qReason').value.trim(),status:'recommend',createdAt:now(),trace:[{act:'提交推荐',st:'recommend',time:now(),by:currentUser.name}]};
-    DB.quotas.unshift(o);saveDB();pushNotify({to:'超级管理员',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushNotify({to:'终端管理员',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushNotify({to:'会 长',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushLog('团员名额','提交 '+name+' 的名额推荐');closeModal();if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已提交，进入审核中心待办','ok')};
+    DB.quotas.unshift(o);saveDB();if(window.ZY)ZY.push();pushNotify({to:'超级管理员',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushNotify({to:'终端管理员',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushNotify({to:'会 长',kind:'audit',title:'团员名额申请',content:`${name} 的名额申请已提交，请到审核中心处理`});pushLog('团员名额','提交 '+name+' 的名额推荐');closeModal();if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已提交，进入审核中心待办','ok')};
 };
-window.quotaSubmit=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;q.status='review';q.trace=q.trace||[];q.trace.push({act:'送审',st:'review',time:now(),by:currentUser.name});saveDB();pushNotify({to:'超级管理员',kind:'audit',title:'团员名额送审',content:`${q.name} 的名额申请已送审，请到审核中心处理`});pushNotify({to:'终端管理员',kind:'audit',title:'团员名额送审',content:`${q.name} 的名额申请已送审，请到审核中心处理`});pushLog('团员名额','送审 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已送审','ok')};
-window.quotaApprove=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;q.status='approved';q.trace=q.trace||[];q.trace.push({act:'审核通过',st:'approved',time:now(),by:currentUser.name});saveDB();pushNotify({to:q.name,kind:'sys',title:'团员名额通过',content:`您（${q.name}）的团员名额申请已通过审核。`});pushLog('团员名额','通过 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已通过','ok')};
-window.quotaReject=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;const r=prompt('驳回原因：');q.status='rejected';q.trace=q.trace||[];q.trace.push({act:'驳回'+(r?('：'+r):''),st:'rejected',time:now(),by:currentUser.name});saveDB();pushNotify({to:q.name,kind:'sys',title:'团员名额驳回',content:`您（${q.name}）的团员名额申请未通过${r?('：'+r):''}。`});pushLog('团员名额','驳回 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已驳回','ok')};
+window.quotaSubmit=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;q.status='review';q.trace=q.trace||[];q.trace.push({act:'送审',st:'review',time:now(),by:currentUser.name});saveDB();if(window.ZY)ZY.push();pushNotify({to:'超级管理员',kind:'audit',title:'团员名额送审',content:`${q.name} 的名额申请已送审，请到审核中心处理`});pushNotify({to:'终端管理员',kind:'audit',title:'团员名额送审',content:`${q.name} 的名额申请已送审，请到审核中心处理`});pushLog('团员名额','送审 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已送审','ok')};
+window.quotaApprove=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;q.status='approved';q.trace=q.trace||[];q.trace.push({act:'审核通过',st:'approved',time:now(),by:currentUser.name});saveDB();if(window.ZY)ZY.push();pushNotify({to:q.name,kind:'sys',title:'团员名额通过',content:`您（${q.name}）的团员名额申请已通过审核。`});pushLog('团员名额','通过 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已通过','ok')};
+window.quotaReject=function(id){const q=DB.quotas.find(x=>x.id===id);if(!q)return;const r=prompt('驳回原因：');q.status='rejected';q.trace=q.trace||[];q.trace.push({act:'驳回'+(r?('：'+r):''),st:'rejected',time:now(),by:currentUser.name});saveDB();if(window.ZY)ZY.push();pushNotify({to:q.name,kind:'sys',title:'团员名额驳回',content:`您（${q.name}）的团员名额申请未通过${r?('：'+r):''}。`});pushLog('团员名额','驳回 '+q.name);if(currentRoute()==='quota')renderQuota($('#viewRoot'));else if(currentRoute()==='audit')renderAudit($('#viewRoot'));toast('已驳回','ok')};
 
 /* ============================== 数据维护：恢复演示数据 / 清除所有演示数据（不退出系统） ============================== */
 window.restoreDemo=function(){

@@ -562,15 +562,9 @@ function doRegister(){
     pushLog('注册',`新注册 ${name}，待审核`);
     pushNotify({to:'超级管理员',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
     pushNotify({to:'会 长',kind:'audit',title:'新注册待审核',content:`${name} 提交注册，请审核`});
-    /* 云端注册通道：同时把注册申请写入 Supabase zy_regs，电脑端管理员自动拉到审核中心（零配置） */
-    const regPayload={idCard:id,name,org:$('#rOrg').value,gender:$('#rGender').value,birth:$('#rBirth').value,nation:$('#rNation').value,politics:$('#rPolitics').value,religion:$('#rReligion').value,school:$('#rSchool').value,dept:$('#rDept').value,cls:$('#rCls').value,phone:$('#rPhone').value,email:$('#rEmail').value,qq:$('#rQQ').value,wechat:$('#rWechat').value,native:$('#rNative').value,addr:$('#rAddr').value,title:$('#rType').value,avatar,exp:$('#rExp').value,createdAt:now()};
-    if(window.ZYReg){
-      ZYReg.submit(regPayload).then(res=>{
-        if(res.ok){ toast('注册已提交云端，等待管理员审核','ok'); }
-        else { toast('注册已保存本机（云端通道暂不可用）','err'); }
-      });
-    }
-    toast('注册成功！请等待超级管理员审核','ok');$('#registerModal').hidden=true;
+    /* 整库同步上云：pending 用户 + 审核通知一并同步，管理员端拉取后立即出现在审核中心、通知中心角标实时变化（统一走 ZY 零配置同步，不再走割裂的 zy_regs 双通道） */
+    if(window.ZY){ ZY.push().catch(()=>{}); }
+    toast('注册成功！已同步云端，请等待超级管理员审核','ok');$('#registerModal').hidden=true;
   };
   if(photo){const r=new FileReader();r.onload=()=>finish(r.result);r.readAsDataURL(photo)}else finish('');
 }
