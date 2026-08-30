@@ -416,7 +416,20 @@ function renderApp(){
   /* 云端同步：管理角色登录后自动连接 Supabase（已配置时才生效） */
   const cr=currentUser&&currentUser.role;
   const isMgr=cr==='super'||cr==='terminal'||cr==='president'||cr==='vice'||cr==='minister'||cr==='broadcaster'||cr==='etiquette'||cr==='subleague'||cr==='dev';
-  if(isMgr){ try{ initCloudSync(true); }catch(e){} }
+  if(isMgr){
+    try{
+      const _c=window.ZY&&ZY.loadCfg();
+      if(_c&&_c.url&&_c.key&&_c.email&&_c.pwd){ initCloudSync(true); }
+      else {
+        window._syncNeedSetup=true;
+        setTimeout(()=>{
+          if(window._syncNeedSetup&&window.toast){
+            toast('本设备未开启云端同步：请到「系统设置 → 云端同步」填邮箱+密码一次，本设备数据才会与手机/其它电脑互通','err',6000);
+          }
+        },1200);
+      }
+    }catch(e){}
+  }
 }
 window.openCloudUpgradeModal=function(){
   openModal(`<div class="modal wide"><div class="modal-title"><span class="bar"></span>升级到云端同步（解锁全部需求）<span class="bar"></span><button class="x" data-close-modal>×</button></div><div class="modal-body">
